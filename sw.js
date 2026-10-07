@@ -1,9 +1,10 @@
-const CACHE_NAME = 'hf-business-v4';
+const CACHE_NAME = 'hf-business-v5';
 const APP_FILES = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './legacy-migration.js',
   './manifest.json',
   './assets/icon.svg'
 ];
