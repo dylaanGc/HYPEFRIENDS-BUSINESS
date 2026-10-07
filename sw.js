@@ -9,229 +9,65 @@ const APP_SHELL = [
   './assets/icon.svg'
 ];
 
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
 
-// =========================================================
-// INSTALL
-// =========================================================
-
-self.addEventListener(
-  'install',
-  event => {
-
-    event.waitUntil(
-
-      caches
-        .open(CACHE_NAME)
-        .then(cache =>
-          cache.addAll(APP_SHELL)
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
         )
-
-    );
-
-    self.skipWaiting();
-
-  }
-);
-
-
-// =========================================================
-// ACTIVATE
-// =========================================================
-
-self.addEventListener(
-  'activate',
-  event => {
-
-    event.waitUntil(
-
-      caches.keys()
-        .then(keys =>
-
-          Promise.all(
-
-            keys
-              .filter(
-                key =>
-                  key !== CACHE_NAME
-              )
-              .map(
-                key =>
-                  caches.delete(key)
-              )
-
-          )
-
-        )
-
-    );
-
-    self.clients.claim();
-
-  }
-);
-
-
-// =========================================================
-// FETCH
-// =========================================================
-
-self.addEventListener(
-  'fetch',
-  event => {
-
-    const request =
-      event.request;
-
-
-    // No interceptar POST,
-    // Supabase, etc.
-
-    if (
-      request.method !== 'GET'
-    ) {
-
-      return;
-
-    }
-
-
-    const url =
-      new URL(
-        request.url
-      );
-
-
-    // -----------------------------------------------------
-    // SUPABASE NUNCA DEBE SALIR DEL CACHE
-    // -----------------------------------------------------
-
-    if (
-      url.hostname.includes(
-        'supabase.co'
       )
-    ) {
+      .then(() => self.clients.claim())
+  );
+});
 
-      event.respondWith(
-        fetch(request)
-      );
+self.addEventListener('fetch', event => {
+  const request = event.request;
 
-      return;
+  // Solo nos interesa GET
+  if (request.method !== 'GET') return;
 
-    }
-
-
-    // -----------------------------------------------------
-    // APP.JS / INDEX / CSS / SW
-    // SIEMPRE NETWORK FIRST
-    // -----------------------------------------------------
-
-    const isAppFile =
-      url.pathname.endsWith(
-        '/app.js'
-      ) ||
-
-      url.pathname.endsWith(
-        '/index.html'
-      ) ||
-
-      url.pathname.endsWith(
-        '/styles.css'
-      ) ||
-
-      url.pathname.endsWith(
-        '/sw.js'
-      );
-
-
-    if (isAppFile) {
-
-      event.respondWith(
-
-        fetch(request, {
-          cache: 'no-store'
-        })
-        .then(response => {
-
-          if (
-            response &&
-            response.ok
-          ) {
-
-            const copy =
-              response.clone();
-
-            caches
-              .open(CACHE_NAME)
-              .then(cache =>
-                cache.put(
-                  request,
-                  copy
-                )
-              );
-
-          }
-
-          return response;
-
-        })
-        .catch(() =>
-          caches.match(request)
-        )
-
-      );
-
-      return;
-
-    }
-
-
-    // -----------------------------------------------------
-    // RESTO: CACHE FIRST
-    // -----------------------------------------------------
-
+  // Supabase NUNCA debe salir del caché
+  if (
+    request.url.includes('supabase.co') ||
+    request.url.includes('/rest/v1/') ||
+    request.url.includes('/realtime/')
+  ) {
     event.respondWith(
-
-      caches
-        .match(request)
-        .then(cached => {
-
-          if (cached) {
-
-            return cached;
-
-          }
-
-
-          return fetch(request)
-            .then(response => {
-
-              if (
-                response &&
-                response.ok
-              ) {
-
-                const copy =
-                  response.clone();
-
-                caches
-                  .open(CACHE_NAME)
-                  .then(cache =>
-                    cache.put(
-                      request,
-                      copy
-                    )
-                  );
-
-              }
-
-              return response;
-
-            });
-
-        })
-
+      fetch(request).catch(() => caches.match(request))
     );
-
+    return;
   }
-);
 
+  // Para los archivos de la aplicación:
+  // intenta primero internet para recibir cambios de GitHub.
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        if (
+          response &&
+          response.status === 200 &&
+          response.type === 'basic'
+        ) {
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, copy);
+          });
+        }
+
+        return response;
+      })
+      .catch(() => caches.match(request))
+  );
+});
