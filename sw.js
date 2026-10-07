@@ -1,6 +1,11 @@
-const CACHE = 'hf-business-v2';
+/* =========================================================
+   HYPEFRIENDS BUSINESS — SERVICE WORKER
+   Sincronización y actualización de archivos
+   ========================================================= */
 
-const ASSETS = [
+const CACHE_NAME = 'hf-business-v2';
+
+const STATIC_ASSETS = [
   './',
   './index.html',
   './styles.css',
@@ -8,23 +13,30 @@ const ASSETS = [
   './assets/icon.svg'
 ];
 
-// Instalar nueva versión
+/* ---------------------------------------------------------
+   INSTALL
+   --------------------------------------------------------- */
+
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activar nueva versión y borrar cachés anteriores
+/* ---------------------------------------------------------
+   ACTIVATE
+   Elimina cachés viejos
+   --------------------------------------------------------- */
+
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys =>
         Promise.all(
           keys
-            .filter(key => key !== CACHE)
+            .filter(key => key !== CACHE_NAME)
             .map(key => caches.delete(key))
         )
       )
@@ -32,42 +44,104 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Control de archivos
+/* ---------------------------------------------------------
+   FETCH
+   IMPORTANTE:
+   - JS / CSS / HTML siempre intentan red primero.
+   - Supabase nunca se guarda en caché.
+   - Si no hay internet, usa caché como respaldo.
+   --------------------------------------------------------- */
+
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
+  const request = event.request;
 
-  // index.html y app.js SIEMPRE intentan obtener
-  // la versión más reciente del servidor.
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(request.url);
+
+  /* ---------------------------------------------
+     NUNCA CACHEAR SUPABASE
+     --------------------------------------------- */
+
   if (
-    url.pathname.endsWith('/index.html') ||
-    url.pathname.endsWith('/app.js') ||
-    url.pathname === '/'
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('supabase.in')
   ) {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
+    );
+    return;
+  }
+
+  /* ---------------------------------------------
+     ARCHIVOS DE LA APP
+     Network First
+     --------------------------------------------- */
+
+  const isAppFile =
+    request.destination === 'document' ||
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css');
+
+  if (isAppFile) {
+
+    event.respondWith(
+      fetch(request)
         .then(response => {
-          if (response.ok) {
+
+          if (response && response.ok) {
             const copy = response.clone();
 
-            caches.open(CACHE).then(cache => {
-              cache.put(event.request, copy);
-            });
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                cache.put(request, copy);
+              });
           }
 
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => {
+          return caches.match(request);
+        })
     );
 
     return;
   }
 
-  // Para CSS, imágenes, manifest, etc.
-  // usamos caché primero.
+  /* ---------------------------------------------
+     IMÁGENES / OTROS RECURSOS
+     Cache First
+     --------------------------------------------- */
+
   event.respondWith(
-    caches.match(event.request)
-      .then(cached => cached || fetch(event.request))
+    caches.match(request)
+      .then(cached => {
+
+        if (cached) {
+          return cached;
+        }
+
+        return fetch(request)
+          .then(response => {
+
+            if (response && response.ok) {
+              const copy = response.clone();
+
+              caches.open(CACHE_NAME)
+                .then(cache => {
+                  cache.put(request, copy);
+                });
+            }
+
+            return response;
+          });
+      })
   );
+
 });
