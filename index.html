@@ -2,21 +2,21 @@
 <html lang="es" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#090909" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="Inventario, ventas, apartados y gastos de HYPEFRIENDS BUSINESS." />
   <title>HYPEFRIENDS BUSINESS</title>
   <link rel="manifest" href="./manifest.json" />
-  <link rel="stylesheet" href="./styles.css?v=5" />
+  <link rel="stylesheet" href="./styles.css?v=9" />
 </head>
 <body>
   <section id="loginScreen" class="login-screen">
     <form id="loginForm" class="login-card">
       <div class="brand login-brand"><span class="brand-mark">HF</span><span class="brand-name">HYPEFRIENDS</span><small>BUSINESS</small></div>
-      <h1>INICIAR SESIÓN</h1>
-      <p class="muted login-copy">Ingresa con tu cuenta de HYPEFRIENDS BUSINESS.</p>
+      <h1>Bienvenido de nuevo</h1>
+      <p class="muted login-copy">Inicia sesión para administrar tu negocio.</p>
       <div class="form">
         <label for="loginEmail">Correo</label>
         <input id="loginEmail" type="email" autocomplete="username" required placeholder="socio@hypefriends.com" />
@@ -54,16 +54,18 @@
         </div>
       </div>
     </aside>
+    <button id="menuBackdrop" class="menu-backdrop" type="button" aria-label="Cerrar menú"></button>
 
     <main class="main">
       <header class="topbar">
         <div class="top-heading">
-          <button id="menuToggle" class="menu-toggle" type="button" aria-label="Abrir menú">☰</button>
+          <button id="menuToggle" class="menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false"></button>
           <div><div class="eyebrow">HYPEFRIENDS BUSINESS</div><h1 id="viewTitle">INICIO</h1></div>
         </div>
         <div class="top-actions">
           <span class="today-label" id="todayLabel"></span>
           <button id="newSaleBtn" class="primary" type="button">+ NUEVA VENTA</button>
+          <button class="notification-button" type="button" aria-label="Notificaciones"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i></i></button>
         </div>
       </header>
       <section id="content" aria-live="polite"></section>
@@ -79,7 +81,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=6"></script>
+  <script src="./app.js?v=9"></script>
   <script src="./legacy-migration.js?v=1"></script>
 </body>
 </html>

@@ -66,11 +66,17 @@ async function boot() {
   $('#closeModal').onclick = closeModal;
   $('#newSaleBtn').onclick = openSale;
   $('#installBtn').onclick = installApp;
-  $('#menuToggle').onclick = () => $('.sidebar').classList.toggle('menu-open');
+  const toggleMenu = open => {
+    $('.sidebar').classList.toggle('menu-open', open);
+    $('#menuBackdrop').classList.toggle('visible', open);
+    $('#menuToggle').setAttribute('aria-expanded', String(open));
+  };
+  $('#menuToggle').onclick = () => toggleMenu(!$('.sidebar').classList.contains('menu-open'));
+  $('#menuBackdrop').onclick = () => toggleMenu(false);
   $('#todayLabel').textContent = new Date().toLocaleDateString('es-CR', {day:'numeric',month:'short',year:'numeric'});
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => {
     render(b.dataset.view);
-    $('.sidebar').classList.remove('menu-open');
+    toggleMenu(false);
   });
 
   const { data: { session } } = await db.auth.getSession();
@@ -272,14 +278,13 @@ function render(view='dashboard') {
 }
 
 function dashboard(c) {
-  const now=today(), month=now.slice(0,7);
+  const now=today();
   const salesToday=state.sales.filter(s=>s.currency==='CRC'&&dateKey(s.created_at)===now);
-  const salesMonth=state.sales.filter(s=>s.currency==='CRC'&&dateKey(s.created_at).startsWith(month));
   const todayTotal=salesToday.reduce((sum,s)=>sum+Number(s.total||0),0);
-  const monthTotal=salesMonth.reduce((sum,s)=>sum+Number(s.total||0),0);
+  const crc=totals('CRC');
+  const inventoryCost=state.products.reduce((sum,p)=>sum+Number(p.stock||0)*Number(p.cost||0),0);
   const todayExpenses=state.expenses.filter(e=>e.currency==='CRC'&&dateKey(e.created_at)===now).reduce((sum,e)=>sum+Number(e.amount||0),0);
   const soldToday=salesToday.reduce((sum,s)=>sum+(s.sale_items||[]).reduce((n,item)=>n+Number(item.quantity||0),0),0);
-  const stockUnits=state.products.reduce((sum,p)=>sum+Number(p.stock||0),0);
   const pending=state.sales.filter(s=>s.currency==='CRC'&&Number(s.paid)<Number(s.total));
   const pendingTotal=pending.reduce((sum,s)=>sum+Number(s.total||0)-Number(s.paid||0),0);
   const salesByDay=[];
@@ -291,41 +296,33 @@ function dashboard(c) {
   }
   const maxDay=Math.max(...salesByDay.map(day=>day.total),1);
   const bars=salesByDay.map(day=>`<div class="chart-item ${day.key===now?'today':''}" title="${escapeHtml(day.label)} · ${money(day.total)}"><div class="chart-bar" style="height:${Math.max(day.total?7:2,day.total/maxDay*100)}%"></div><span class="chart-label">${escapeHtml(day.label)}</span></div>`).join('');
-  const topProducts=new Map();
-  state.sales.forEach(s=>(s.sale_items||[]).forEach(item=>{
-    const name=item.products?.name||'Producto retirado';
-    const entry=topProducts.get(name)||{quantity:0};
-    entry.quantity+=Number(item.quantity||0);
-    topProducts.set(name,entry);
-  }));
-  const topProductsHtml=[...topProducts.entries()].sort((a,b)=>b[1].quantity-a[1].quantity).slice(0,5).map(([name,item])=>`<div class="payment-row"><span>${escapeHtml(name)}</span><b>${item.quantity} vendidos</b></div>`).join('')||'<p class="muted">Aún no hay productos vendidos.</p>';
   const pendingHtml=pending.slice().sort((a,b)=>Number(b.total)-Number(a.total)).slice(0,5).map(s=>`<div class="payment-row"><span>${escapeHtml(s.customer)}<br><small class="muted">${escapeHtml(s.id.slice(0,8))} · Abonado ${money(s.paid)}</small></span><span class="orange">${money(Number(s.total)-Number(s.paid))}</span></div>`).join('')||'<p class="muted">No hay apartados pendientes.</p>';
+  const featuredProducts=state.products.slice(0,5).map(p=>`<div class="featured-product"><span class="featured-icon" aria-hidden="true">◇</span><span class="featured-info"><b>${escapeHtml(p.name)}</b><small>Talla: ${escapeHtml(p.size||'—')} · Stock: ${Number(p.stock)}</small></span><strong>${money(p.price,p.currency)}</strong></div>`).join('')||'<p class="muted">Agrega productos para verlos aquí.</p>';
   c.innerHTML=`
-    <div class="content-intro"><div><h2>¡Bienvenido, HYPEFRIENDS!</h2><p>Resumen general de tu tienda</p></div></div>
-    <div class="grid dashboard-hero">
-      <div class="card hero-card">
-        <div class="hero-heading"><span>Ventas del mes</span><span>${new Date().toLocaleDateString('es-CR',{month:'long',year:'numeric'})}</span></div>
-        <div class="hero-total">${money(monthTotal)} <small>CRC</small></div>
-        <div class="chart">${bars}</div>
-        <div class="chart-axis"><span>Últimos 7 días</span><span>Colones costarricenses</span></div>
-      </div>
-      <div class="hero-side">
-        ${metricCard('Ventas de hoy',money(todayTotal),'▣','')}
-        ${metricCard('Stock disponible',`${stockUnits} uds.`,'▤','green')}
-        ${metricCard('Gastos de hoy',money(todayExpenses),'▦','blue')}
-        ${metricCard('Apartados pendientes',money(pendingTotal),'▧','purple',`${pending.length} pendientes`)}
-      </div>
+    <div class="content-intro"><div><h2>Resumen del negocio</h2><p>Controla tus ventas, inventario y apartados</p></div></div>
+    <section class="card sales-overview">
+      <div class="sales-overview-heading"><div><div class="label">Monto total vendido</div><div class="sales-overview-total">${money(crc.total)} <small>CRC</small></div></div><span class="sales-period">Últimos 7 días</span></div>
+      <div class="chart sales-overview-chart" role="img" aria-label="Gráfica de ventas de los últimos siete días">${bars}</div>
+      <div class="sales-chart-axis"><span>${escapeHtml(salesByDay[0].label)}</span><span>${escapeHtml(salesByDay[6].label)}</span></div>
+    </section>
+    <div class="grid overview-metrics">
+      ${metricCard('Ventas registradas',money(crc.total),'▣','')}
+      ${metricCard('Costo de mercadería',money(inventoryCost),'◇','green')}
+      ${metricCard('Gastos totales',money(crc.expenses),'▦','blue')}
+      ${metricCard('Dinero en apartados',money(pendingTotal),'⬡','yellow',`${pending.length} activos`)}
     </div>
-    <div class="grid stats">
+    <section class="card featured-inventory">
+      <div class="section-title"><h2>Inventario destacado</h2><button class="text-action" onclick="render('inventory')">Ver inventario</button></div>
+      <div class="featured-list">${featuredProducts}</div>
+    </section>
+    <div class="grid dashboard-lower">
+      <div class="card"><div class="section-title"><h2>Últimos apartados</h2><button class="text-action" onclick="render('installments')">Ver todos</button></div>${pendingHtml}</div>
+    </div>
+    <div class="stats dashboard-quick-stats">
       ${statCard('Ventas de hoy',money(todayTotal),'▣','green')}
       ${statCard('Transacciones',salesToday.length,'◷','blue')}
       ${statCard('Productos vendidos',soldToday,'▤','purple')}
       ${statCard('Clientes',state.customers.length,'♙','yellow')}
-    </div>
-    <div class="grid dashboard-lower">
-      <div class="card chart-card"><div class="section-title"><h2>Ventas por día</h2><span class="muted">Últimos 7 días</span></div><div class="chart">${bars}</div><div class="chart-axis"><span>${escapeHtml(salesByDay[0].label)}</span><span>${escapeHtml(salesByDay[6].label)}</span></div></div>
-      <div class="card"><div class="section-title"><h2>Top productos</h2><button class="secondary small" onclick="render('inventory')">Ver inventario</button></div>${topProductsHtml}</div>
-      <div class="card"><div class="section-title"><h2>Últimos apartados</h2><button class="secondary small" onclick="render('installments')">Ver todos</button></div>${pendingHtml}</div>
     </div>`;
 }
 
@@ -339,13 +336,13 @@ function statCard(label,value,icon,tone){
 
 function saleTable(n=99) {
   const rows=state.sales.slice(-n).reverse();
-  return `<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Total</th><th>Pagado</th><th>Estado</th><th></th></tr></thead><tbody>${rows.map(s=>`<tr><td><b>${escapeHtml(s.customer)}</b><br><span class="muted">${escapeHtml(s.id)}</span></td><td>${money(s.total,s.currency)}</td><td>${money(s.paid,s.currency)}</td><td><span class="badge ${s.paid>=s.total?'green':'orange'}">${s.paid>=s.total?'Pagada':'Pendiente'}</span></td><td>${s.paid<s.total?`<button class="primary small" onclick="openPayment('${s.id}')">ABONO</button>`:''}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No hay ventas todavía.</td></tr>'}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows.map(s=>`<tr><td><b>${escapeHtml(s.customer)}</b><br><span class="muted">${escapeHtml(s.id)}</span></td><td>${money(s.total,s.currency)}</td><td>${money(s.paid,s.currency)}</td><td><span class="badge ${s.paid>=s.total?'green':'orange'}">${s.paid>=s.total?'Pagada':'Pendiente'}</span></td><td class="sale-actions"><div class="actions">${s.paid<s.total?`<button class="primary small" onclick="openPayment('${s.id}')">ABONO</button>`:''}<button class="delete-button" onclick="deleteSale('${s.id}')">ELIMINAR</button></div></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No hay ventas todavía.</td></tr>'}</tbody></table></div>`;
 }
 
-function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos registrados en colones costarricenses.</p></div><button class="primary" onclick="openSale()">+ NUEVA VENTA</button></div>${saleTable()}`;}
+function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos registrados en colones costarricenses.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
 
 function inventory(c){
-  c.innerHTML=`<div class="content-intro"><div><h2>Inventario</h2><p>Administra existencias y precios en colones.</p></div><button class="primary" onclick="openProduct()">+ PRODUCTO</button></div><div class="product-list">${state.products.map(p=>`<div class="card product"><div class="product-head"><span class="badge">${escapeHtml(p.category)}</span><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div><h3>${escapeHtml(p.name)}</h3><div class="stock">${Number(p.stock)} <span class="muted">unidades</span></div><div class="muted">Venta: ${money(p.price)} · Costo: ${money(p.cost)}</div><div class="bar"><span style="width:${Math.min(Number(p.stock)*10,100)}%"></span></div><div class="actions" style="margin-top:12px"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR STOCK</button></div></div>`).join('')||'<div class="card muted">No hay productos. Agrega el primero con el botón + Producto.</div>'}</div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Sneakers, hoodies y artículos en bodega</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Talla</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name">${escapeHtml(p.name)}</td><td>${escapeHtml(p.size||'—')}</td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.currency)}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function finance(c){
@@ -357,7 +354,7 @@ function customers(c){c.innerHTML=`<div class="content-intro"><div><h2>Clientes<
 
 function installments(c){
   const rows=state.sales.filter(s=>Number(s.paid)<Number(s.total)||s.payments.length).slice().reverse();
-  c.innerHTML=`<div class="content-intro"><div><h2>Apartados y abonos</h2><p>Registra pagos parciales o elimina un abono incorrecto.</p></div><button class="primary" onclick="openSale()">+ NUEVO APARTADO</button></div><div class="grid">${rows.map(s=>`<article class="card"><div class="product-head"><div><div class="label">${escapeHtml(s.customer)}</div><h3>${escapeHtml(s.id)}</h3><span class="badge ${Number(s.paid)>=Number(s.total)?'green':'orange'}">${Number(s.paid)>=Number(s.total)?'Pagado':'Pendiente'}</span></div>${Number(s.paid)<Number(s.total)?`<button class="primary small" onclick="openPayment('${s.id}')">+ ABONO</button>`:''}</div><div class="grid stats"><div><div class="label">Total</div><div class="metric">${money(s.total)}</div></div><div><div class="label">Abonado</div><div class="metric">${money(s.paid)}</div></div><div><div class="label">Saldo</div><div class="metric orange">${money(Math.max(Number(s.total)-Number(s.paid),0))}</div></div></div><div class="payment-list">${s.payments.map(p=>`<div class="payment-row"><span><span class="payment-amount">${money(p.amount)}</span><br><small class="muted">${dateKey(p.created_at)}</small></span><button class="delete-button" onclick="deletePayment('${s.id}','${p.id}')">QUITAR ABONO</button></div>`).join('')||'<span class="muted">No se han registrado abonos.</span>'}</div></article>`).join('')||'<div class="card muted">No hay apartados ni abonos. Registra una venta con un pago parcial para empezar.</div>'}</div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Apartados</h2><p>Control de pagos parciales y saldos pendientes</p></div><button class="primary" onclick="openSale()">♧ <span>NUEVO APARTADO</span></button></div><div class="installment-list">${rows.map(s=>{const balance=Math.max(Number(s.total)-Number(s.paid),0), progress=Number(s.total)>0?Math.min(Number(s.paid)/Number(s.total)*100,100):0;return `<article class="card installment-card"><div class="installment-heading"><div><h3>${escapeHtml(s.customer)}</h3><p>${escapeHtml((s.sale_items||[]).map(item=>item.products?.name||'Producto').join(', ')||s.id)}</p></div><span class="badge ${balance?'orange':'green'}">${balance?'Pendiente':'Pagado'}</span></div><div class="installment-totals"><span>Abonado: <b>${money(s.paid)}</b></span><span>Resta: <b class="${balance?'orange':''}">${money(balance)}</b></span></div><div class="progress-track"><span style="width:${progress}%"></span></div><div class="installment-actions">${balance?`<button class="installment-pay" onclick="openPayment('${s.id}')">+ Abonar plata</button>`:''}</div><div class="payment-list">${s.payments.map(p=>`<div class="payment-row"><span><span class="payment-amount">${money(p.amount)}</span><br><small class="muted">${dateKey(p.created_at)}</small></span><button class="delete-button" onclick="deletePayment('${s.id}','${p.id}')">QUITAR ABONO</button></div>`).join('')}</div></article>`;}).join('')||'<div class="card muted">No hay apartados ni abonos. Registra una venta con un pago parcial para empezar.</div>'}</div>`;
 }
 
 function history(c){
@@ -409,6 +406,42 @@ async function createSale(){
   if(stockErr){console.error(stockErr);toast('Venta creada, pero no se pudo actualizar stock');}
 
   await loadAll(); closeModal(); render('sales'); toast('VENTA REGISTRADA EN LA NUBE');
+  if(realPaid>0){
+    const createdSale=state.sales.find(row=>row.id===sale.id);
+    if(createdSale)showReceipt(createdSale,realPaid);
+  }
+}
+
+async function deleteSale(id){
+  const sale=state.sales.find(row=>row.id===id);
+  if(!sale)return toast('No se encontró la venta. Recarga la vista e inténtalo de nuevo.');
+  if(!window.confirm(`¿Eliminar la venta de ${sale.customer} por ${money(sale.total,sale.currency)}? También se eliminarán sus abonos y se intentará devolver el inventario.`))return;
+
+  const {data:items,error:itemsError}=await db.from('sale_items').select('product_id,quantity').eq('sale_id',id);
+  if(itemsError){console.error('Sale items lookup:',itemsError);return toast('No se pudo revisar el inventario asociado a la venta.');}
+
+  const {data:deleted,error:deleteError}=await db.from('sales').delete().eq('id',id).select('id').maybeSingle();
+  if(deleteError||!deleted){console.error('Sale delete:',deleteError);return toast('No se pudo eliminar la venta.');}
+
+  const quantities=new Map();
+  (items||[]).forEach(item=>{
+    if(item.product_id)quantities.set(item.product_id,(quantities.get(item.product_id)||0)+Number(item.quantity||0));
+  });
+  const stockErrors=[];
+  for(const [productId,quantity] of quantities){
+    const {data:product,error:readError}=await db.from('products').select('id,name,stock').eq('id',productId).maybeSingle();
+    if(readError||!product){console.error('Sale stock lookup:',readError||`Product ${productId} was not found.`);stockErrors.push(productId);continue;}
+    const {data:updated,error:updateError}=await db.from('products').update({
+      stock:Number(product.stock||0)+quantity,
+      updated_at:new Date().toISOString()
+    }).eq('id',productId).eq('stock',product.stock).select('id').maybeSingle();
+    if(updateError||!updated){console.error('Sale stock restore:',updateError||`Stock for ${product.name} changed concurrently.`);stockErrors.push(product.name);}
+  }
+
+  await loadAll();
+  render('sales');
+  if(stockErrors.length)return toast(`Venta eliminada; no se pudo restaurar el stock de: ${stockErrors.join(', ')}. Revisa el inventario.`);
+  toast('VENTA ELIMINADA Y STOCK RESTAURADO');
 }
 
 function openPayment(id){
@@ -431,26 +464,40 @@ async function addPayment(id){
   render('sales');
 }
 
-function receiptText(s,amount){return `HYPEFRIENDS BUSINESS\nCOMPROBANTE DE PAGO\n\nCliente: ${s.customer}\nVenta: ${s.id}\nPago recibido: ${money(amount,s.currency)}\nTotal compra: ${money(s.total,s.currency)}\nTotal abonado: ${money(s.paid,s.currency)}\nSaldo pendiente: ${money(Number(s.total)-Number(s.paid),s.currency)}\n\nSIN INTERESES\nGracias por comprar en HYPEFRIENDS.`;}
+function receiptText(s,amount){
+  const items=(s.sale_items||[]).map(item=>`- ${item.products?.name||'Producto'} × ${Number(item.quantity)||1}`).join('\n')||'- Artículos de la venta';
+  return `HYPEFRIENDS BUSINESS\nFACTURA / COMPROBANTE DE ABONO\n\nCliente: ${s.customer}\nVenta: ${s.id}\nFecha: ${new Date().toLocaleDateString('es-CR')}\n\nArtículos:\n${items}\n\nAbono recibido: ${money(amount,s.currency)}\nTotal de compra: ${money(s.total,s.currency)}\nTotal abonado: ${money(s.paid,s.currency)}\nSaldo pendiente: ${money(Math.max(Number(s.total)-Number(s.paid),0),s.currency)}\n\nSIN INTERESES\nGracias por comprar en HYPEFRIENDS.`;}
 
 function showReceipt(s,amount){
-  modal(`<div class="receipt" id="receiptPreview"><div class="receipt-head">HYPEFRIENDS</div><div class="muted">STREETWEAR & DROPS · COMPROBANTE DE PAGO</div><hr><div class="receipt-row"><span>Cliente</span><b>${escapeHtml(s.customer)}</b></div><div class="receipt-row"><span>Venta</span><b>${escapeHtml(s.id)}</b></div><div class="receipt-row"><span>Pago recibido</span><b>${money(amount,s.currency)}</b></div><div class="receipt-row"><span>Total compra</span><b>${money(s.total,s.currency)}</b></div><div class="receipt-row"><span>Total abonado</span><b>${money(s.paid,s.currency)}</b></div><hr><div class="receipt-row"><span>Saldo pendiente</span><b class="receipt-total">${money(Number(s.total)-Number(s.paid),s.currency)}</b></div><hr><b>SIN INTERESES</b><p class="muted">Gracias por comprar en HYPEFRIENDS.</p></div><div class="actions" style="margin-top:14px"><button class="primary" onclick="shareReceiptImage('${s.id}',${Number(amount)})">📲 COMPARTIR IMAGEN</button><button class="outline light-button" onclick="shareReceiptText('${s.id}',${Number(amount)})">WHATSAPP / TEXTO</button><button class="outline light-button" onclick="closeModal()">CERRAR</button></div>`);
+  const items=(s.sale_items||[]).map(item=>`<div class="receipt-row"><span>${escapeHtml(item.products?.name||'Producto')} × ${Number(item.quantity)||1}</span><b>${money(Number(item.unit_price||0)*Number(item.quantity||1),s.currency)}</b></div>`).join('')||'<div class="receipt-row"><span>Artículos de la venta</span></div>';
+  modal(`<div class="receipt" id="receiptPreview"><div class="receipt-head">HYPEFRIENDS</div><div class="muted">STREETWEAR & DROPS · FACTURA DE ABONO</div><hr><div class="receipt-row"><span>Cliente</span><b>${escapeHtml(s.customer)}</b></div><div class="receipt-row"><span>Venta</span><b>${escapeHtml(s.id)}</b></div><div class="receipt-row"><span>Fecha</span><b>${new Date().toLocaleDateString('es-CR')}</b></div><hr><b>ARTÍCULOS</b>${items}<hr><div class="receipt-row"><span>Abono recibido</span><b>${money(amount,s.currency)}</b></div><div class="receipt-row"><span>Total compra</span><b>${money(s.total,s.currency)}</b></div><div class="receipt-row"><span>Total abonado</span><b>${money(s.paid,s.currency)}</b></div><hr><div class="receipt-row"><span>Saldo pendiente</span><b class="receipt-total">${money(Math.max(Number(s.total)-Number(s.paid),0),s.currency)}</b></div><hr><b>SIN INTERESES</b><p class="muted">Gracias por comprar en HYPEFRIENDS.</p></div><div class="actions" style="margin-top:14px"><button class="primary" onclick="shareReceiptImage('${s.id}',${Number(amount)})">📲 COMPARTIR FACTURA</button><button class="outline light-button" onclick="shareReceiptText('${s.id}',${Number(amount)})">WHATSAPP / TEXTO</button><button class="outline light-button" onclick="closeModal()">CERRAR</button></div>`);
 }
 
 function buildReceiptCanvas(s,amount){
-  const canvas=document.createElement('canvas'); canvas.width=900; canvas.height=1120;
+  const items=s.sale_items||[];
+  const canvas=document.createElement('canvas'); canvas.width=900; canvas.height=1100+Math.max(items.length,1)*54;
   const ctx=canvas.getContext('2d');
   ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#090909'; ctx.textAlign='left';
   ctx.font='900 48px Arial'; ctx.fillText('HYPEFRIENDS',60,90);
-  ctx.font='700 22px Arial'; ctx.fillText('BUSINESS · COMPROBANTE DE PAGO',60,135);
+  ctx.font='700 22px Arial'; ctx.fillText('BUSINESS · FACTURA DE ABONO',60,135);
   ctx.strokeStyle='#cccccc'; ctx.setLineDash([8,8]); ctx.beginPath(); ctx.moveTo(60,175); ctx.lineTo(840,175); ctx.stroke(); ctx.setLineDash([]);
-  const rows=[['Cliente',s.customer],['Venta',s.id],['Pago recibido',money(amount,s.currency)],['Total compra',money(s.total,s.currency)],['Total abonado',money(s.paid,s.currency)],['Saldo pendiente',money(Number(s.total)-Number(s.paid),s.currency)]];
-  let y=240; ctx.font='500 25px Arial';
-  rows.forEach(([a,b],i)=>{ctx.fillStyle='#777';ctx.fillText(a,60,y);ctx.fillStyle='#090909';ctx.font=i===5?'900 38px Arial':'700 26px Arial';ctx.fillText(String(b),840,y,{align:'right'});ctx.textAlign='left';y+=95;ctx.font='500 25px Arial';});
-  ctx.strokeStyle='#cccccc';ctx.beginPath();ctx.moveTo(60,y-40);ctx.lineTo(840,y-40);ctx.stroke();
-  ctx.font='900 28px Arial';ctx.fillStyle='#090909';ctx.fillText('SIN INTERESES',60,y+25);
-  ctx.font='500 21px Arial';ctx.fillStyle='#777';ctx.fillText('Gracias por comprar en HYPEFRIENDS.',60,y+70);
+  const rows=[['Cliente',s.customer],['Venta',s.id],['Fecha',new Date().toLocaleDateString('es-CR')]];
+  let y=240;
+  rows.forEach(([label,value])=>{ctx.font='500 25px Arial';ctx.fillStyle='#777';ctx.fillText(label,60,y);ctx.font='700 26px Arial';ctx.fillStyle='#090909';ctx.fillText(String(value).slice(0,38),840,y,{align:'right'});ctx.textAlign='left';y+=64;});
+  ctx.strokeStyle='#ddd';ctx.beginPath();ctx.moveTo(60,y-25);ctx.lineTo(840,y-25);ctx.stroke();
+  ctx.font='900 24px Arial';ctx.fillStyle='#090909';ctx.fillText('ARTÍCULOS',60,y+15);y+=65;
+  (items.length?items:[{products:{name:'Artículos de la venta'},quantity:1,unit_price:0}]).forEach(item=>{
+    const label=`${item.products?.name||'Producto'} × ${Number(item.quantity)||1}`;
+    ctx.font='500 22px Arial';ctx.fillStyle='#333';ctx.fillText(label.slice(0,40),60,y);
+    ctx.font='700 22px Arial';ctx.fillStyle='#090909';ctx.fillText(money(Number(item.unit_price||0)*Number(item.quantity||1),s.currency),840,y,{align:'right'});
+    ctx.textAlign='left';y+=54;
+  });
+  y+=10;ctx.strokeStyle='#ccc';ctx.beginPath();ctx.moveTo(60,y-25);ctx.lineTo(840,y-25);ctx.stroke();y+=30;
+  const totals=[['Abono recibido',money(amount,s.currency)],['Total de compra',money(s.total,s.currency)],['Total abonado',money(s.paid,s.currency)],['Saldo pendiente',money(Math.max(Number(s.total)-Number(s.paid),0),s.currency)]];
+  totals.forEach(([label,value],index)=>{ctx.font=index===3?'900 30px Arial':'500 24px Arial';ctx.fillStyle=index===3?'#090909':'#777';ctx.fillText(label,60,y);ctx.textAlign='right';ctx.fillStyle=index===3?'#f06418':'#090909';ctx.fillText(value,840,y);ctx.textAlign='left';y+=62;});
+  ctx.font='900 28px Arial';ctx.fillStyle='#090909';ctx.fillText('SIN INTERESES',60,y+10);
+  ctx.font='500 21px Arial';ctx.fillStyle='#777';ctx.fillText('Gracias por comprar en HYPEFRIENDS.',60,y+55);
   return canvas;
 }
 
@@ -474,12 +521,12 @@ async function shareReceiptText(id,amount){
   await navigator.clipboard?.writeText(text); toast('Comprobante copiado; pégalo en WhatsApp');
 }
 
-function openProduct(){modal(`<h2>NUEVO PRODUCTO</h2><div class="form"><label>Nombre<input id="pName" required></label><div class="form-grid"><label>Categoría<input id="pCat" value="General"></label><label>Stock inicial<input id="pStock" type="number" value="1" min="0" step="1"></label><label>Costo (CRC)<input id="pCost" type="number" value="0" min="0" step="0.01"></label><label>Precio (CRC)<input id="pPrice" type="number" value="0" min="0" step="0.01"></label></div><p class="muted">Todos los precios se guardan en colones costarricenses.</p><button class="primary" onclick="createProduct()">GUARDAR PRODUCTO</button></div>`);}
+function openProduct(){modal(`<h2>NUEVO PRODUCTO</h2><div class="form"><label>Nombre<input id="pName" required></label><div class="form-grid"><label>Talla<input id="pSize" placeholder="Ej. S, M, L, 38 o UNSIZE"></label><label>Stock inicial<input id="pStock" type="number" value="1" min="0" step="1"></label><label>Costo (CRC)<input id="pCost" type="number" value="0" min="0" step="0.01"></label><label>Precio (CRC)<input id="pPrice" type="number" value="0" min="0" step="0.01"></label></div><p class="muted">Todos los precios se guardan en colones costarricenses.</p><button class="primary" onclick="createProduct()">GUARDAR PRODUCTO</button></div>`);}
 
 async function createProduct(){
   const name=$('#pName').value.trim(), stock=Number($('#pStock').value), cost=Number($('#pCost').value), price=Number($('#pPrice').value);
   if(!name||![stock,cost,price].every(Number.isFinite)||stock<0||cost<0||price<0)return toast('Revisa el nombre, stock, costo y precio.');
-  const row={name,category:$('#pCat').value.trim()||'General',stock,cost,price,currency:'CRC'};
+  const row={name,size:$('#pSize').value.trim()||null,stock,cost,price,currency:'CRC'};
   const {error}=await db.from('products').insert(row); if(error){console.error(error);return toast('No se pudo guardar el producto');}
   await loadAll();closeModal();render('inventory');toast('PRODUCTO GUARDADO EN LA NUBE');
 }

@@ -146,3 +146,132 @@ input::placeholder{color:#737377}
 @media(max-width:1050px){.dashboard-lower{grid-template-columns:1fr 1fr}.chart-card:first-child{grid-column:1/-1}.dashboard-hero{grid-template-columns:minmax(0,1.4fr) minmax(210px,.9fr)}.product-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.sidebar{width:62px;padding:15px 6px}.brand-mark{font-size:32px}.brand-name,.brand small{display:none}nav{margin-top:25px}.nav{justify-content:center;padding:9px 3px;font-size:0}.nav-icon{font-size:16px}.sidebar-bottom .outline,.sync,.user-info{display:none}.user-box{justify-content:center}.sidebar.menu-open{width:180px}.sidebar.menu-open .brand-name,.sidebar.menu-open .brand small{display:block}.sidebar.menu-open .nav{justify-content:flex-start;padding:8px;font-size:12px}.main{margin-left:62px;padding-inline:11px}.topbar{height:50px}.top-heading{gap:8px}.dashboard-hero{grid-template-columns:1fr}.hero-side{grid-template-columns:1fr 1fr}.metric-card{padding:10px}.dashboard-lower{grid-template-columns:1fr}.chart-card:first-child{grid-column:auto}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.today-label{display:none}.top-actions{gap:5px}.primary{padding:9px 10px;font-size:10px}.content-intro{align-items:start;flex-direction:column}.hero-side{grid-template-columns:1fr 1fr}.hero-total{font-size:36px}.hero-card{padding:14px}.chart{height:96px}.product-list{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.modal-card{padding:20px}.table-wrap{margin-inline:-1px}th,td{padding:9px 8px;font-size:10px}}
+
+:root{--orange:#ff5817;--orange-soft:#32180f;--green:#33c99b}
+body{background:#090909}
+.notification-button{position:relative;display:grid;place-items:center;width:44px;height:44px;border:1px solid #2b2b2e;border-radius:15px;background:#151517;color:#b9b9bd}
+.notification-button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.notification-button i{position:absolute;right:8px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--orange)}
+.menu-backdrop{display:none}
+.overview-metrics{gap:14px;margin:10px 0 20px}
+.overview-metrics .metric-card{min-height:110px;padding:20px 24px}
+.overview-metrics .metric-icon{width:58px;height:58px;border-radius:16px;font-size:24px}
+.overview-metrics .label{font-size:12px;letter-spacing:.4px;color:#aaa}
+.overview-metrics .metric{font-size:24px;margin-top:6px}
+.overview-metrics .metric-note{background:#332610;border:1px solid #5b4514;border-radius:9px;padding:8px 11px;color:#f3c438;font-size:12px}
+.featured-inventory{margin:24px 0;padding:22px}
+.featured-inventory .section-title{margin:0 0 15px}
+.featured-inventory .section-title h2{text-transform:uppercase;letter-spacing:1px}
+.text-action{border:0;background:none;color:var(--orange);font-weight:700;padding:6px}
+.featured-list{display:grid;gap:10px}
+.featured-product{display:flex;align-items:center;gap:14px;min-width:0;border:1px solid #29292c;border-radius:18px;padding:14px 16px}
+.featured-icon{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:#242427;color:#a2a2a7;font-size:27px}
+.featured-info{display:grid;gap:4px;min-width:0;flex:1}
+.featured-info b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.featured-info small{color:#88888e;font-size:11px}
+.featured-product strong{white-space:nowrap;font-size:14px}
+.inventory-add{border-radius:14px;padding:14px 18px;font-size:13px}
+.inventory-table{border-radius:20px}
+.inventory-table table{min-width:680px;font-size:13px}
+.inventory-table th{font-size:11px;padding:16px}
+.inventory-table td{padding:18px 16px;font-size:13px;white-space:normal}
+.inventory-name{font-weight:600;max-width:200px}
+.inventory-price{font-weight:700;color:#fff!important}
+.stock-badge{display:inline-block;background:#102c24;color:#36d0a1;padding:6px 9px;border-radius:9px;font-weight:700}
+.installment-list{display:grid;gap:16px}
+.installment-card{padding:22px;border-radius:22px}
+.installment-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.installment-heading h3{font-size:16px;margin:0 0 7px}
+.installment-heading p{margin:0;color:#a1a1a5;font-size:14px}
+.installment-heading .badge{font-size:11px;border-radius:9px;padding:8px 11px}
+.installment-heading .badge.orange{background:#382b12;color:#f1c644}
+.installment-totals{display:flex;justify-content:space-between;gap:10px;margin:22px 0 10px;color:#aaa;font-size:13px}
+.installment-totals b{color:#fff;font-size:14px}
+.installment-totals b.orange{color:var(--orange)}
+.progress-track{height:9px;background:#29292c;border-radius:12px;overflow:hidden}
+.progress-track span{display:block;height:100%;background:var(--orange);border-radius:inherit}
+.installment-actions{display:flex;gap:10px;margin-top:20px}
+.installment-pay{flex:1;border:1px solid #783618;background:#301b14;color:var(--orange);border-radius:15px;padding:13px;font-size:15px;font-weight:700}
+.dashboard-quick-stats{margin-top:12px}
+.sales-overview{margin:0 0 16px;padding:20px 22px;border-radius:22px;background:linear-gradient(145deg,#1c1b1b,#131313);border-color:#302d2b}
+.sales-overview-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sales-overview .label{font-size:11px;color:#aaa;letter-spacing:.7px}
+.sales-overview-total{margin-top:8px;font-size:clamp(27px,5vw,38px);line-height:1.1;font-weight:800;letter-spacing:-1px}
+.sales-overview-total small{font-size:11px;color:#999;letter-spacing:0}
+.sales-period{padding:7px 10px;border:1px solid #3a2b22;border-radius:10px;color:#f5a06e;background:#2b1b13;font-size:10px;white-space:nowrap}
+.sales-overview-chart{height:104px;margin-top:18px;border-color:#3a3532}
+.sales-overview-chart .chart-bar{background:#67351f}
+.sales-overview-chart .chart-item.today .chart-bar{background:var(--orange)}
+.sales-chart-axis{display:flex;justify-content:space-between;margin-top:22px;color:#858589;font-size:10px}
+.login-screen{background:radial-gradient(ellipse at 50% 0,#33180f 0,transparent 44%),#090909}
+.login-card{background:linear-gradient(145deg,#19191b,#111112);color:#f5f5f5;border:1px solid #2d2d30;border-radius:24px;padding:38px;box-shadow:0 28px 80px #0009}
+.login-brand{margin-bottom:30px}
+.login-brand .brand-mark{display:grid;place-items:center;width:70px;height:70px;padding:0;border:1px solid #783719;border-radius:22px;background:#32190f;color:var(--orange);font-size:34px;letter-spacing:-5px}
+.login-brand .brand-name{font-size:16px;color:#fff;letter-spacing:1px}
+.login-brand small{color:var(--orange);font-size:9px}
+.login-card h1{font-size:26px;color:#fff;letter-spacing:-.5px}
+.login-copy{color:#a1a1a5;line-height:1.5}
+.login-card .form label{color:#ddd;font-size:11px}
+.login-card .form input{background:#101011;border-color:#353538;color:#fff;padding:13px 14px;border-radius:10px}
+.login-card .form input:focus{border-color:var(--orange);box-shadow:0 0 0 3px #ff58171c}
+.login-card .primary{background:var(--orange);border-radius:11px;padding:14px;width:100%;box-shadow:0 8px 24px #ff58172b}
+.login-error{color:#ff9185}
+.login-card .login-copy{font-size:13px}
+.sale-actions{min-width:145px}
+.sale-actions .delete-button{border-color:#452523;color:#ff8c82}
+.receipt{max-height:55vh;overflow:auto}
+.receipt .receipt-row b{overflow-wrap:anywhere;text-align:right}
+
+@media(max-width:760px){
+  .sidebar{width:min(78vw,280px);padding:28px 18px 18px;transform:translateX(-105%);transition:transform .22s ease;box-shadow:none}
+  .sidebar.menu-open{width:min(78vw,280px);transform:translateX(0);box-shadow:12px 0 36px #000b}
+  .sidebar .brand-mark{font-size:40px}
+  .sidebar .brand-name,.sidebar .brand small{display:block}
+  .sidebar nav{margin-top:30px}
+  .sidebar .nav{justify-content:flex-start;padding:12px 10px;font-size:14px}
+  .sidebar-bottom .outline,.sidebar-bottom .sync,.sidebar .user-info{display:block}
+  .sidebar .user-box{justify-content:flex-start}
+  .menu-backdrop.visible{display:block;position:fixed;inset:0;z-index:11;border:0;background:#0009}
+  .main{margin-left:0;padding:0 16px 32px}
+  .topbar{position:sticky;top:0;z-index:10;height:calc(72px + env(safe-area-inset-top));margin:0 -16px;padding:env(safe-area-inset-top) 20px 0;background:#0a0a0af2;border-bottom:1px solid #242426;backdrop-filter:blur(14px)}
+  .top-heading{gap:17px}
+  .menu-toggle{width:30px;height:36px;padding:0;border:0;border-radius:0;background:transparent;font-size:0}
+  .menu-toggle:before{content:"";display:block;width:20px;height:2px;background:#aaa;box-shadow:0 6px #aaa,0 -6px #aaa}
+  .top-heading h1{font-size:17px;font-weight:700}
+  .eyebrow,.today-label,#newSaleBtn{display:none}
+  .notification-button{width:48px;height:48px;border-radius:16px}
+  #content{padding-top:16px}
+  .content-intro{margin:22px 0 18px;align-items:flex-start}
+  .content-intro h2{font-size:24px;letter-spacing:-.5px}
+  .content-intro p{font-size:14px;margin-top:5px}
+  .sales-overview{padding:20px 18px;margin-bottom:16px}
+  .sales-overview-chart{height:100px}
+  .overview-metrics{grid-template-columns:1fr;gap:14px;margin-top:26px}
+  .overview-metrics .metric-card{min-height:104px;padding:18px 20px;border-radius:22px}
+  .overview-metrics .metric-icon{width:58px;height:58px}
+  .overview-metrics .label{font-size:12px}
+  .overview-metrics .metric{font-size:24px}
+  .featured-inventory{margin:24px 0;padding:20px 16px;border-radius:24px}
+  .featured-inventory .section-title h2{font-size:15px}
+  .featured-product{padding:12px;border-radius:19px;gap:11px}
+  .featured-info b{font-size:13px}
+  .featured-product strong{font-size:12px}
+  .inventory-add{font-size:14px;padding:14px 18px}
+  .inventory-table{margin-inline:0}
+  .inventory-table table{min-width:690px}
+  .installment-list{gap:16px}
+  .installment-card{padding:22px 20px;border-radius:24px}
+  .installment-heading h3{font-size:16px}
+  .installment-heading p{font-size:14px;max-width:230px;line-height:1.4}
+  .installment-totals{font-size:13px}
+  .installment-pay{padding:13px 10px}
+  .dashboard-lower{margin-top:20px}
+  .dashboard-quick-stats{margin-top:14px}
+}
+@media(max-width:480px){
+  .content-intro{flex-direction:column}
+  .inventory-add{width:max-content}
+  .installment-heading p{max-width:190px}
+  .modal-card{border-radius:20px}
+  .login-card{padding:28px 22px}
+}
