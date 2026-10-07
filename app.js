@@ -1,5 +1,6 @@
 /* =========================================================
-   HYPEFRIENDS BUSINESS — SUPABASE / PWA
+   HYPEFRIENDS BUSINESS
+   SUPABASE / PWA / REALTIME
    ========================================================= */
 
 const SUPABASE_URL = 'https://ynowgseafpcfgvsmkub.supabase.co';
@@ -16,17 +17,12 @@ if (
 
     if (el) {
       el.textContent =
-        'No se pudo cargar el módulo de Supabase. Abre la aplicación desde un servidor/hosting HTTPS y vuelve a intentar.';
+        'No se pudo cargar Supabase. Abre la aplicación desde HTTPS.';
     }
   });
 
   throw new Error('Supabase JS no cargó');
 }
-
-
-/* =========================================================
-   SUPABASE
-   ========================================================= */
 
 const db = window.supabase.createClient(
   SUPABASE_URL,
@@ -42,15 +38,10 @@ const db = window.supabase.createClient(
 
 
 /* =========================================================
-   HELPERS
+   UTILIDADES
    ========================================================= */
 
-const $ = s => document.querySelector(s);
-
-
-/* =========================================================
-   ESTADO
-   ========================================================= */
+const $ = selector => document.querySelector(selector);
 
 const state = {
   user: null,
@@ -64,18 +55,9 @@ const state = {
   view: 'dashboard',
 
   realtime: null,
-
-  // Sincronización de respaldo
-  syncTimer: null,
-
-  // Evita varias cargas simultáneas
   loading: false
 };
 
-
-/* =========================================================
-   PRODUCTOS POR DEFECTO
-   ========================================================= */
 
 const DEFAULT_PRODUCTS = [
   {
@@ -113,56 +95,46 @@ const DEFAULT_PRODUCTS = [
 ];
 
 
-/* =========================================================
-   UTILIDADES
-   ========================================================= */
-
-const money = (n, c = 'CRC') =>
-  c === 'USD'
-    ? '$' +
-      Number(n || 0).toLocaleString('en-US', {
+const money = (n, currency = 'CRC') => {
+  return currency === 'USD'
+    ? '$' + Number(n || 0).toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })
-    : '₡' +
-      Math.round(Number(n || 0)).toLocaleString('es-CR');
+    : '₡' + Math.round(Number(n || 0)).toLocaleString('es-CR');
+};
 
 
 const today = () =>
   new Date().toISOString().slice(0, 10);
 
 
-const escapeHtml = v =>
-  String(v ?? '').replace(
+const escapeHtml = value =>
+  String(value ?? '').replace(
     /[&<>'"]/g,
-    ch =>
-      ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      })[ch]
+    ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[ch])
   );
 
 
-const toast = m => {
-  const t = $('#toast');
+const toast = message => {
+  const element = $('#toast');
 
-  if (!t) return;
+  if (!element) return;
 
-  t.textContent = m;
-  t.classList.add('show');
+  element.textContent = message;
+  element.classList.add('show');
 
   setTimeout(() => {
-    t.classList.remove('show');
+    element.classList.remove('show');
   }, 2200);
 };
 
-
-/* =========================================================
-   INDICADOR DE SINCRONIZACIÓN
-   ========================================================= */
 
 function setSync(ok, text) {
   const dot = $('#syncDot');
@@ -185,17 +157,17 @@ function setSync(ok, text) {
    ========================================================= */
 
 function showLogin(show = true) {
-  $('#loginScreen').classList.toggle(
+  $('#loginScreen')?.classList.toggle(
     'hidden',
     !show
   );
 
-  $('#app').classList.toggle(
+  $('#app')?.classList.toggle(
     'app-visible',
     !show
   );
 
-  $('#app').classList.toggle(
+  $('#app')?.classList.toggle(
     'hidden-app',
     show
   );
@@ -203,74 +175,38 @@ function showLogin(show = true) {
 
 
 /* =========================================================
-   SERVICE WORKER
-   ========================================================= */
-
-async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    return;
-  }
-
-  try {
-    const registration =
-      await navigator.serviceWorker.register('./sw.js');
-
-    console.log(
-      '✅ Service Worker registrado:',
-      registration.scope
-    );
-
-    // Fuerza una comprobación de actualización
-    await registration.update();
-
-    // Cuando el nuevo Service Worker tome control,
-    // recarga la aplicación para utilizar los archivos nuevos.
-    navigator.serviceWorker.addEventListener(
-      'controllerchange',
-      () => {
-        console.log(
-          '🔄 Nueva versión de la aplicación detectada'
-        );
-
-        window.location.reload();
-      },
-      { once: true }
-    );
-
-  } catch (error) {
-    console.error(
-      '❌ Error registrando Service Worker:',
-      error
-    );
-  }
-}
-
-
-/* =========================================================
-   BOOT
+   ARRANQUE
    ========================================================= */
 
 async function boot() {
 
-  $('#loginForm').addEventListener(
+  console.log('=================================');
+  console.log('HYPEFRIENDS BUSINESS');
+  console.log('Supabase iniciado');
+  console.log('URL:', SUPABASE_URL);
+  console.log('=================================');
+
+  $('#loginForm')?.addEventListener(
     'submit',
     login
   );
 
-  $('#logoutBtn').addEventListener(
+  $('#logoutBtn')?.addEventListener(
     'click',
     logout
   );
 
-  $('#closeModal').onclick =
-    closeModal;
+  if ($('#closeModal')) {
+    $('#closeModal').onclick = closeModal;
+  }
 
-  $('#newSaleBtn').onclick =
-    openSale;
+  if ($('#newSaleBtn')) {
+    $('#newSaleBtn').onclick = openSale;
+  }
 
-  $('#installBtn').onclick =
-    installApp;
-
+  if ($('#installBtn')) {
+    $('#installBtn').onclick = installApp;
+  }
 
   document
     .querySelectorAll('.nav')
@@ -280,28 +216,37 @@ async function boot() {
     });
 
 
-  /* -----------------------------------------
-     SESIÓN ACTUAL
-  ----------------------------------------- */
+  try {
 
-  const {
-    data: { session }
-  } = await db.auth.getSession();
+    const {
+      data: { session },
+      error
+    } = await db.auth.getSession();
 
+    if (error) {
+      console.error(
+        'Error obteniendo sesión:',
+        error
+      );
+    }
 
-  if (session) {
-    await startApp(session);
+    if (session) {
+      await startApp(session);
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Error iniciando aplicación:',
+      error
+    );
   }
 
-
-  /* -----------------------------------------
-     CAMBIOS DE AUTENTICACIÓN
-  ----------------------------------------- */
 
   db.auth.onAuthStateChange(
     (_event, sessionNow) => {
 
-      setTimeout(() => {
+      setTimeout(async () => {
 
         if (sessionNow) {
 
@@ -310,7 +255,7 @@ async function boot() {
             state.session.access_token !==
               sessionNow.access_token
           ) {
-            startApp(sessionNow);
+            await startApp(sessionNow);
           }
 
         } else {
@@ -324,11 +269,33 @@ async function boot() {
   );
 
 
-  /* -----------------------------------------
-     SERVICE WORKER
-  ----------------------------------------- */
+  /* Service Worker */
 
-  registerServiceWorker();
+  if ('serviceWorker' in navigator) {
+
+    try {
+
+      const registration =
+        await navigator.serviceWorker.register(
+          './sw.js',
+          { updateViaCache: 'none' }
+        );
+
+      console.log(
+        'Service Worker registrado:',
+        registration.scope
+      );
+
+      await registration.update();
+
+    } catch (error) {
+
+      console.error(
+        'Error Service Worker:',
+        error
+      );
+    }
+  }
 }
 
 
@@ -336,16 +303,15 @@ async function boot() {
    LOGIN
    ========================================================= */
 
-async function login(e) {
+async function login(event) {
 
-  e.preventDefault();
+  event.preventDefault();
 
   const email =
-    $('#loginEmail').value.trim();
+    $('#loginEmail')?.value.trim();
 
   const password =
-    $('#loginPassword').value;
-
+    $('#loginPassword')?.value;
 
   $('#loginError').textContent =
     'Conectando...';
@@ -365,58 +331,46 @@ async function login(e) {
     const {
       data,
       error
-    } =
-      await db.auth.signInWithPassword({
-        email,
-        password
-      });
+    } = await db.auth.signInWithPassword({
+      email,
+      password
+    });
 
 
     if (error) {
 
       console.error(
-        'Supabase login error:',
+        'Supabase login:',
         error
       );
 
-
-      const msg =
-        String(
-          error.message || ''
-        ).toLowerCase();
+      const message =
+        String(error.message || '')
+          .toLowerCase();
 
 
       if (
-        msg.includes(
+        message.includes(
           'email not confirmed'
         )
       ) {
 
         $('#loginError').textContent =
-          'Este correo todavía no está confirmado en Supabase. Ve a Authentication → Users y confirma el usuario.';
+          'Este correo todavía no está confirmado en Supabase.';
 
       } else if (
-        msg.includes(
+        message.includes(
           'invalid login credentials'
         )
       ) {
 
         $('#loginError').textContent =
-          'Correo o contraseña incorrectos. Revisa los datos del usuario en Supabase.';
-
-      } else if (
-        msg.includes('failed to fetch') ||
-        msg.includes('network')
-      ) {
-
-        $('#loginError').textContent =
-          'No se puede conectar con Supabase. Comprueba tu conexión a internet y abre la app desde un servidor/hosting HTTPS.';
+          'Correo o contraseña incorrectos.';
 
       } else {
 
         $('#loginError').textContent =
           `Error de Supabase: ${error.message}`;
-
       }
 
       return;
@@ -424,22 +378,24 @@ async function login(e) {
 
 
     $('#loginError').textContent =
-      '✓ Acceso correcto. Cargando HYPEFRIENDS BUSINESS...';
+      '✓ Acceso correcto.';
 
 
     if (data?.session) {
       await startApp(data.session);
     }
 
-  } catch (err) {
+  } catch (error) {
 
     console.error(
       'Login exception:',
-      err
+      error
     );
 
     $('#loginError').textContent =
-      `Error inesperado: ${err.message || err}`;
+      `Error inesperado: ${
+        error.message || error
+      }`;
   }
 }
 
@@ -449,12 +405,23 @@ async function login(e) {
    ========================================================= */
 
 async function logout() {
-  await db.auth.signOut();
+
+  try {
+
+    await db.auth.signOut();
+
+  } catch (error) {
+
+    console.error(
+      'Logout:',
+      error
+    );
+  }
 }
 
 
 /* =========================================================
-   INICIAR APP
+   START APP
    ========================================================= */
 
 async function startApp(session) {
@@ -462,18 +429,16 @@ async function startApp(session) {
   state.session = session;
   state.user = session.user;
 
-
-  $('#userEmail').textContent =
-    state.user.email ||
-    'Usuario';
-
+  if ($('#userEmail')) {
+    $('#userEmail').textContent =
+      state.user.email || 'Usuario';
+  }
 
   showLogin(false);
 
-
   setSync(
     true,
-    'Sincronizando nube...'
+    'Conectando con Supabase...'
   );
 
 
@@ -483,10 +448,7 @@ async function startApp(session) {
 
   subscribeRealtime();
 
-  startSyncFallback();
-
   render(state.view);
-
 
   setSync(
     true,
@@ -496,14 +458,13 @@ async function startApp(session) {
 
 
 /* =========================================================
-   DETENER APP
+   STOP APP
    ========================================================= */
 
 function stopApp() {
 
-  /* Detener Realtime */
-
   if (state.realtime) {
+
     db.removeChannel(
       state.realtime
     );
@@ -511,19 +472,6 @@ function stopApp() {
     state.realtime = null;
   }
 
-
-  /* Detener sincronización */
-
-  if (state.syncTimer) {
-    clearInterval(
-      state.syncTimer
-    );
-
-    state.syncTimer = null;
-  }
-
-
-  /* Limpiar estado */
 
   state.user = null;
   state.session = null;
@@ -533,39 +481,39 @@ function stopApp() {
   state.expenses = [];
   state.customers = [];
 
-
   showLogin(true);
 }
 
 
 /* =========================================================
-   PERFIL
+   PROFILE
    ========================================================= */
 
 async function ensureProfile() {
 
   if (!state.user) return;
 
+  const {
+    error
+  } = await db
+    .from('profiles')
+    .upsert(
+      {
+        id: state.user.id,
 
-  const { error } =
-    await db
-      .from('profiles')
-      .upsert(
-        {
-          id: state.user.id,
-
-          name:
-            state.user.user_metadata?.name ||
-            state.user.email?.split('@')[0] ||
-            'Socio'
-        },
-        {
-          onConflict: 'id'
-        }
-      );
+        name:
+          state.user.user_metadata?.name ||
+          state.user.email?.split('@')[0] ||
+          'Socio'
+      },
+      {
+        onConflict: 'id'
+      }
+    );
 
 
   if (error) {
+
     console.warn(
       'Profile:',
       error.message
@@ -575,26 +523,28 @@ async function ensureProfile() {
 
 
 /* =========================================================
-   CARGAR TODOS LOS DATOS
+   CARGAR DATOS
    ========================================================= */
 
 async function loadAll() {
 
-  if (!state.user) return;
-
-  // Evita cargas simultáneas
   if (state.loading) return;
 
   state.loading = true;
+
+  setSync(
+    true,
+    'Cargando datos...'
+  );
 
 
   try {
 
     const [
-      p,
-      c,
-      e,
-      s
+      productsResult,
+      customersResult,
+      expensesResult,
+      salesResult
     ] = await Promise.all([
 
       db
@@ -602,9 +552,7 @@ async function loadAll() {
         .select('*')
         .order(
           'created_at',
-          {
-            ascending: true
-          }
+          { ascending: true }
         ),
 
       db
@@ -612,9 +560,7 @@ async function loadAll() {
         .select('*')
         .order(
           'created_at',
-          {
-            ascending: true
-          }
+          { ascending: true }
         ),
 
       db
@@ -622,83 +568,83 @@ async function loadAll() {
         .select('*')
         .order(
           'created_at',
-          {
-            ascending: true
-          }
+          { ascending: true }
         ),
 
       db
         .from('sales')
-        .select(
-          '*, customers(name,phone,email), sale_items(*, products(name)), payments(*)'
-        )
+        .select(`
+          *,
+          customers(name,phone,email),
+          sale_items(*,products(name)),
+          payments(*)
+        `)
         .order(
           'created_at',
-          {
-            ascending: true
-          }
+          { ascending: true }
         )
     ]);
 
 
-    const err =
-      p.error ||
-      c.error ||
-      e.error ||
-      s.error;
+    const error =
+      productsResult.error ||
+      customersResult.error ||
+      expensesResult.error ||
+      salesResult.error;
 
 
-    if (err) {
+    if (error) {
+
+      console.error(
+        'Error cargando datos:',
+        error
+      );
 
       setSync(
         false,
-        'Error de conexión'
+        'Error cargando datos'
       );
 
-      console.error(err);
+      toast(
+        'No se pudieron cargar los datos'
+      );
 
       return;
     }
 
 
     state.products =
-      p.data || [];
-
+      productsResult.data || [];
 
     state.customers =
-      c.data || [];
-
+      customersResult.data || [];
 
     state.expenses =
-      e.data || [];
+      expensesResult.data || [];
 
 
     state.sales =
-      (s.data || []).map(x => ({
+      (salesResult.data || [])
+        .map(sale => ({
 
-        ...x,
+          ...sale,
 
-        customer:
-          x.customers?.name ||
-          'Cliente',
+          customer:
+            sale.customers?.name ||
+            'Cliente',
 
-        payments:
-          (x.payments || [])
-            .sort(
-              (a, b) =>
-                String(
-                  a.created_at
-                ).localeCompare(
-                  String(
-                    b.created_at
-                  )
-                )
-            )
+          payments:
+            (sale.payments || [])
+              .sort(
+                (a, b) =>
+                  String(a.created_at)
+                    .localeCompare(
+                      String(b.created_at)
+                    )
+              )
 
-      }));
+        }));
 
-
-    /* Crear productos iniciales */
 
     if (!state.products.length) {
       await seedProducts();
@@ -710,17 +656,6 @@ async function loadAll() {
       'Sincronizado con Supabase'
     );
 
-  } catch (error) {
-
-    console.error(
-      'loadAll error:',
-      error
-    );
-
-    setSync(
-      false,
-      'Error de sincronización'
-    );
 
   } finally {
 
@@ -738,13 +673,10 @@ async function seedProducts() {
   const {
     data,
     error
-  } =
-    await db
-      .from('products')
-      .insert(
-        DEFAULT_PRODUCTS
-      )
-      .select();
+  } = await db
+    .from('products')
+    .insert(DEFAULT_PRODUCTS)
+    .select();
 
 
   if (!error) {
@@ -763,12 +695,13 @@ async function seedProducts() {
 
 
 /* =========================================================
-   SUPABASE REALTIME
+   REALTIME
    ========================================================= */
 
 function subscribeRealtime() {
 
-  /* Eliminar canal anterior */
+  if (!state.user) return;
+
 
   if (state.realtime) {
 
@@ -778,6 +711,14 @@ function subscribeRealtime() {
 
     state.realtime = null;
   }
+
+
+  const channelName =
+    `hypefriends-business-${state.user.id}-${Date.now()}`;
+
+
+  const channel =
+    db.channel(channelName);
 
 
   const tables = [
@@ -790,14 +731,6 @@ function subscribeRealtime() {
   ];
 
 
-  const channel =
-    db.channel(
-      `hypefriends-business-sync-${state.user.id}`
-    );
-
-
-  /* Escuchar TODAS las tablas */
-
   tables.forEach(table => {
 
     channel.on(
@@ -805,85 +738,87 @@ function subscribeRealtime() {
       {
         event: '*',
         schema: 'public',
-        table: table
+        table
       },
-
-      async payload => {
+      payload => {
 
         console.log(
-          '🔄 Cambio recibido:',
+          '🔄 CAMBIO SUPABASE:',
           table,
           payload
         );
 
+        /*
+         * Esperamos un poco para permitir
+         * que las relaciones se actualicen.
+         */
 
-        await loadAll();
+        setTimeout(async () => {
 
-        render(
-          state.view
-        );
+          await loadAll();
 
-
-        setSync(
-          true,
-          'Sincronizado en tiempo real'
-        );
-      }
-    );
-
-  });
-
-
-  /* Conectar canal */
-
-  state.realtime =
-    channel.subscribe(
-      (status, err) => {
-
-        console.log(
-          '📡 Realtime:',
-          status,
-          err || ''
-        );
-
-
-        if (
-          status ===
-          'SUBSCRIBED'
-        ) {
+          render(state.view);
 
           setSync(
             true,
             'Sincronizado en tiempo real'
           );
 
+        }, 150);
+
+      }
+    );
+
+  });
+
+
+  state.realtime =
+    channel.subscribe(
+      (status, error) => {
+
+        console.log(
+          '📡 REALTIME:',
+          status,
+          error || ''
+        );
+
+
+        if (status === 'SUBSCRIBED') {
+
           console.log(
-            '✅ Realtime conectado'
+            '✅ REALTIME CONECTADO'
+          );
+
+          setSync(
+            true,
+            'Sincronizado en tiempo real'
           );
         }
 
 
         if (
-          status ===
-          'CHANNEL_ERROR'
+          status === 'CHANNEL_ERROR'
         ) {
+
+          console.error(
+            '❌ REALTIME ERROR:',
+            error
+          );
 
           setSync(
             false,
             'Error de sincronización'
           );
-
-          console.error(
-            '❌ Error Realtime:',
-            err
-          );
         }
 
 
         if (
-          status ===
-          'TIMED_OUT'
+          status === 'TIMED_OUT'
         ) {
+
+          console.warn(
+            'Realtime timeout'
+          );
 
           setSync(
             false,
@@ -892,61 +827,14 @@ function subscribeRealtime() {
         }
 
 
-        if (
-          status ===
-          'CLOSED'
-        ) {
+        if (status === 'CLOSED') {
 
           setSync(
             false,
             'Sincronización desconectada'
           );
         }
-
       }
-    );
-}
-
-
-/* =========================================================
-   SINCRONIZACIÓN DE RESPALDO
-   =========================================================
-
-   Si Realtime falla, cada 5 segundos consulta Supabase.
-
-   Esto permite que:
-   TELÉFONO → SUPABASE → COMPUTADORA
-
-   y
-
-   COMPUTADORA → SUPABASE → TELÉFONO
-
-   sigan funcionando.
-========================================================= */
-
-function startSyncFallback() {
-
-  if (state.syncTimer) {
-    clearInterval(
-      state.syncTimer
-    );
-  }
-
-
-  state.syncTimer =
-    setInterval(
-      async () => {
-
-        if (!state.user) return;
-
-        await loadAll();
-
-        render(
-          state.view
-        );
-
-      },
-      5000
     );
 }
 
@@ -959,30 +847,23 @@ function totals(currency) {
 
   const sales =
     state.sales.filter(
-      s =>
-        s.currency ===
-        currency
+      sale =>
+        sale.currency === currency
     );
 
 
   const total =
     sales.reduce(
-      (a, s) =>
-        a +
-        Number(
-          s.total || 0
-        ),
+      (sum, sale) =>
+        sum + Number(sale.total || 0),
       0
     );
 
 
   const paid =
     sales.reduce(
-      (a, s) =>
-        a +
-        Number(
-          s.paid || 0
-        ),
+      (sum, sale) =>
+        sum + Number(sale.paid || 0),
       0
     );
 
@@ -990,16 +871,12 @@ function totals(currency) {
   const expenses =
     state.expenses
       .filter(
-        e =>
-          e.currency ===
-          currency
+        expense =>
+          expense.currency === currency
       )
       .reduce(
-        (a, e) =>
-          a +
-          Number(
-            e.amount || 0
-          ),
+        (sum, expense) =>
+          sum + Number(expense.amount || 0),
         0
       );
 
@@ -1007,11 +884,10 @@ function totals(currency) {
   return {
     total,
     paid,
-    due:
-      Math.max(
-        total - paid,
-        0
-      ),
+    due: Math.max(
+      total - paid,
+      0
+    ),
     expenses
   };
 }
@@ -1021,88 +897,62 @@ function totals(currency) {
    RENDER
    ========================================================= */
 
-function render(
-  view = 'dashboard'
-) {
+function render(view = 'dashboard') {
 
   state.view = view;
 
 
   document
     .querySelectorAll('.nav')
-    .forEach(b => {
+    .forEach(button => {
 
-      b.classList.toggle(
+      button.classList.toggle(
         'active',
-        b.dataset.view ===
-          view
+        button.dataset.view === view
       );
 
     });
 
 
-  $('#viewTitle').textContent =
-    {
-      dashboard: 'DASHBOARD',
-      sales: 'VENTAS',
-      inventory: 'INVENTARIO',
-      finance: 'FINANZAS',
-      customers: 'CLIENTES',
-      history: 'HISTORIAL'
-    }[view] ||
-    'DASHBOARD';
+  const titles = {
+    dashboard: 'DASHBOARD',
+    sales: 'VENTAS',
+    inventory: 'INVENTARIO',
+    finance: 'FINANZAS',
+    customers: 'CLIENTES',
+    history: 'HISTORIAL'
+  };
 
 
-  const c =
-    $('#content');
-
-
-  if (
-    view ===
-    'dashboard'
-  ) {
-    dashboard(c);
+  if ($('#viewTitle')) {
+    $('#viewTitle').textContent =
+      titles[view] ||
+      'DASHBOARD';
   }
 
 
-  if (
-    view ===
-    'sales'
-  ) {
-    sales(c);
-  }
+  const content = $('#content');
+
+  if (!content) return;
 
 
-  if (
-    view ===
-    'inventory'
-  ) {
-    inventory(c);
-  }
+  if (view === 'dashboard')
+    dashboard(content);
 
+  if (view === 'sales')
+    sales(content);
 
-  if (
-    view ===
-    'finance'
-  ) {
-    finance(c);
-  }
+  if (view === 'inventory')
+    inventory(content);
 
+  if (view === 'finance')
+    finance(content);
 
-  if (
-    view ===
-    'customers'
-  ) {
-    customers(c);
-  }
+  if (view === 'customers')
+    customers(content);
 
-
-  if (
-    view ===
-    'history'
-  ) {
-    history(c);
-  }
+  if (view === 'history')
+    history(content);
 }
 
 
@@ -1121,11 +971,8 @@ function dashboard(c) {
 
   const stock =
     state.products.reduce(
-      (a, p) =>
-        a +
-        Number(
-          p.stock || 0
-        ),
+      (sum, product) =>
+        sum + Number(product.stock || 0),
       0
     );
 
@@ -1146,7 +993,6 @@ function dashboard(c) {
 
 
       <div class="card">
-
         <div class="label">
           Cobrado CRC
         </div>
@@ -1154,12 +1000,10 @@ function dashboard(c) {
         <div class="metric orange">
           ${money(crc.paid, 'CRC')}
         </div>
-
       </div>
 
 
       <div class="card">
-
         <div class="label">
           Ventas USD
         </div>
@@ -1167,12 +1011,10 @@ function dashboard(c) {
         <div class="metric">
           ${money(usd.total, 'USD')}
         </div>
-
       </div>
 
 
       <div class="card">
-
         <div class="label">
           Stock total
         </div>
@@ -1180,7 +1022,6 @@ function dashboard(c) {
         <div class="metric">
           ${stock}
         </div>
-
       </div>
 
     </div>
@@ -1213,11 +1054,7 @@ function dashboard(c) {
       <div>
 
         <div class="section-title">
-
-          <h2>
-            RESUMEN
-          </h2>
-
+          <h2>RESUMEN</h2>
         </div>
 
 
@@ -1274,9 +1111,7 @@ function dashboard(c) {
               ${
                 state.products.filter(
                   p =>
-                    Number(
-                      p.stock
-                    ) <= 3
+                    Number(p.stock) <= 3
                 ).length
               }
             </div>
@@ -1293,7 +1128,7 @@ function dashboard(c) {
 
 
 /* =========================================================
-   TABLA DE VENTAS
+   TABLA VENTAS
    ========================================================= */
 
 function saleTable(n = 99) {
@@ -1326,95 +1161,86 @@ function saleTable(n = 99) {
         <tbody>
 
           ${
-            rows
-              .map(
-                s => `
+            rows.map(sale => `
 
-                <tr>
+              <tr>
 
-                  <td>
+                <td>
 
-                    <b>
-                      ${escapeHtml(
-                        s.customer
-                      )}
-                    </b>
-
-                    <br>
-
-                    <span class="muted">
-                      ${escapeHtml(
-                        s.id
-                      )}
-                    </span>
-
-                  </td>
-
-
-                  <td>
-                    ${money(
-                      s.total,
-                      s.currency
+                  <b>
+                    ${escapeHtml(
+                      sale.customer
                     )}
-                  </td>
+                  </b>
 
+                  <br>
 
-                  <td>
-                    ${money(
-                      s.paid,
-                      s.currency
+                  <span class="muted">
+                    ${escapeHtml(
+                      sale.id
                     )}
-                  </td>
+                  </span>
+
+                </td>
 
 
-                  <td>
-
-                    <span
-                      class="badge ${
-                        s.paid >= s.total
-                          ? 'green'
-                          : 'orange'
-                      }"
-                    >
-
-                      ${
-                        s.paid >= s.total
-                          ? 'Pagada'
-                          : 'Pendiente'
-                      }
-
-                    </span>
-
-                  </td>
+                <td>
+                  ${money(
+                    sale.total,
+                    sale.currency
+                  )}
+                </td>
 
 
-                  <td>
+                <td>
+                  ${money(
+                    sale.paid,
+                    sale.currency
+                  )}
+                </td>
 
+
+                <td>
+
+                  <span
+                    class="badge ${
+                      sale.paid >= sale.total
+                        ? 'green'
+                        : 'orange'
+                    }"
+                  >
                     ${
-                      s.paid <
-                      s.total
-
-                        ? `
-
-                          <button
-                            class="primary small"
-                            onclick="openPayment('${s.id}')"
-                          >
-                            ABONO
-                          </button>
-
-                        `
-
-                        : ''
+                      sale.paid >= sale.total
+                        ? 'Pagada'
+                        : 'Pendiente'
                     }
+                  </span>
 
-                  </td>
+                </td>
 
-                </tr>
 
-              `
-              )
-              .join('') ||
+                <td>
+
+                  ${
+                    sale.paid < sale.total
+                      ? `
+                        <button
+                          class="primary small"
+                          onclick="openPayment('${sale.id}')"
+                        >
+                          ABONO
+                        </button>
+                      `
+                      : ''
+                  }
+
+                </td>
+
+              </tr>
+
+            `).join('')
+
+            ||
 
             `
               <tr>
@@ -1495,71 +1321,75 @@ function inventory(c) {
 
       ${
         state.products
-          .map(
-            p => `
+          .map(product => `
 
-              <div class="card product">
+            <div class="card product">
 
-                <div class="label">
-                  ${escapeHtml(
-                    p.category
-                  )}
-                </div>
+              <div class="label">
+                ${escapeHtml(
+                  product.category
+                )}
+              </div>
 
-                <h3>
-                  ${escapeHtml(
-                    p.name
-                  )}
-                </h3>
 
-                <div class="stock">
-                  ${Number(
-                    p.stock
-                  )}
+              <h3>
+                ${escapeHtml(
+                  product.name
+                )}
+              </h3>
 
-                  <span class="muted">
-                    unidades
-                  </span>
-                </div>
 
-                <div class="muted">
+              <div class="stock">
 
-                  Venta:
-                  ${money(
-                    p.price,
-                    p.currency
-                  )}
+                ${Number(
+                  product.stock
+                )}
 
-                  ·
-
-                  Costo:
-                  ${money(
-                    p.cost,
-                    p.currency
-                  )}
-
-                </div>
-
-                <div class="bar">
-
-                  <span
-                    style="
-                      width:${Math.min(
-                        Number(
-                          p.stock
-                        ) * 10,
-                        100
-                      )}%
-                    "
-                  ></span>
-
-                </div>
+                <span class="muted">
+                  unidades
+                </span>
 
               </div>
 
-            `
-          )
-          .join('') ||
+
+              <div class="muted">
+
+                Venta:
+                ${money(
+                  product.price,
+                  product.currency
+                )}
+
+                ·
+
+                Costo:
+                ${money(
+                  product.cost,
+                  product.currency
+                )}
+
+              </div>
+
+
+              <div class="bar">
+
+                <span
+                  style="
+                    width:${Math.min(
+                      Number(product.stock) * 10,
+                      100
+                    )}%
+                  "
+                ></span>
+
+              </div>
+
+            </div>
+
+          `)
+          .join('')
+
+        ||
 
         `
           <div class="card muted">
@@ -1627,18 +1457,12 @@ function finance(c) {
         </div>
 
         <div class="metric">
-
-          ${money(
-            crc.expenses
-          )}
-
+          ${money(crc.expenses)}
           ·
-
           ${money(
             usd.expenses,
             'USD'
           )}
-
         </div>
 
       </div>
@@ -1683,39 +1507,35 @@ function finance(c) {
             state.expenses
               .slice()
               .reverse()
-              .map(
-                x => `
+              .map(expense => `
 
-                  <tr>
+                <tr>
 
-                    <td>
-                      ${escapeHtml(
-                        x.note
-                      )}
-                    </td>
+                  <td>
+                    ${escapeHtml(
+                      expense.note
+                    )}
+                  </td>
 
-                    <td>
-                      ${money(
-                        x.amount,
-                        x.currency
-                      )}
-                    </td>
+                  <td>
+                    ${money(
+                      expense.amount,
+                      expense.currency
+                    )}
+                  </td>
 
-                    <td>
-                      ${String(
-                        x.created_at ||
-                        ''
-                      ).slice(
-                        0,
-                        10
-                      )}
-                    </td>
+                  <td>
+                    ${String(
+                      expense.created_at || ''
+                    ).slice(0, 10)}
+                  </td>
 
-                  </tr>
+                </tr>
 
-                `
-              )
-              .join('') ||
+              `)
+              .join('')
+
+            ||
 
             `
               <tr>
@@ -1767,43 +1587,41 @@ function customers(c) {
 
       ${
         state.customers
-          .map(
-            x => `
+          .map(customer => `
 
-              <div class="card">
+            <div class="card">
 
-                <h3>
-                  ${escapeHtml(
-                    x.name
-                  )}
-                </h3>
+              <h3>
+                ${escapeHtml(
+                  customer.name
+                )}
+              </h3>
 
-                <div class="muted">
-
-                  ${escapeHtml(
-                    x.phone ||
-                    'Sin teléfono'
-                  )}
-
-                </div>
-
-                ${
-                  x.email
-                    ? `
-                      <div class="muted">
-                        ${escapeHtml(
-                          x.email
-                        )}
-                      </div>
-                    `
-                    : ''
-                }
-
+              <div class="muted">
+                ${escapeHtml(
+                  customer.phone ||
+                  'Sin teléfono'
+                )}
               </div>
 
-            `
-          )
-          .join('') ||
+              ${
+                customer.email
+                  ? `
+                    <div class="muted">
+                      ${escapeHtml(
+                        customer.email
+                      )}
+                    </div>
+                  `
+                  : ''
+              }
+
+            </div>
+
+          `)
+          .join('')
+
+        ||
 
         `
           <div class="card muted">
@@ -1827,76 +1645,62 @@ function history(c) {
   const rows = [];
 
 
-  state.sales.forEach(
-    s => {
+  state.sales.forEach(sale => {
 
-      s.payments.forEach(
-        p => {
-
-          rows.push({
-            type: 'Pago',
-
-            desc:
-              `${s.customer} · ${s.id}`,
-
-            amount:
-              p.amount,
-
-            currency:
-              p.currency ||
-              s.currency,
-
-            date:
-              String(
-                p.created_at ||
-                ''
-              ).slice(
-                0,
-                10
-              )
-          });
-
-        }
-      );
-
-    }
-  );
-
-
-  state.expenses.forEach(
-    e => {
+    sale.payments.forEach(payment => {
 
       rows.push({
-        type: 'Gasto',
+        type: 'Pago',
 
         desc:
-          e.note,
+          `${sale.customer} · ${sale.id}`,
 
         amount:
-          e.amount,
+          payment.amount,
 
         currency:
-          e.currency,
+          payment.currency ||
+          sale.currency,
 
         date:
           String(
-            e.created_at ||
-            ''
-          ).slice(
-            0,
-            10
-          )
+            payment.created_at || ''
+          ).slice(0, 10)
       });
 
-    }
-  );
+    });
+
+  });
+
+
+  state.expenses.forEach(expense => {
+
+    rows.push({
+
+      type: 'Gasto',
+
+      desc:
+        expense.note,
+
+      amount:
+        expense.amount,
+
+      currency:
+        expense.currency,
+
+      date:
+        String(
+          expense.created_at || ''
+        ).slice(0, 10)
+
+    });
+
+  });
 
 
   rows.sort(
     (a, b) =>
-      b.date.localeCompare(
-        a.date
-      )
+      b.date.localeCompare(a.date)
   );
 
 
@@ -1931,52 +1735,48 @@ function history(c) {
 
           ${
             rows
-              .map(
-                r => `
+              .map(row => `
 
-                  <tr>
+                <tr>
 
-                    <td>
+                  <td>
+                    <span class="badge">
+                      ${row.type}
+                    </span>
+                  </td>
 
-                      <span class="badge">
-                        ${r.type}
-                      </span>
+                  <td>
+                    ${escapeHtml(
+                      row.desc
+                    )}
+                  </td>
 
-                    </td>
+                  <td>
+                    ${money(
+                      row.amount,
+                      row.currency
+                    )}
+                  </td>
 
-                    <td>
-                      ${escapeHtml(
-                        r.desc
-                      )}
-                    </td>
+                  <td>
+                    ${row.date}
+                  </td>
 
-                    <td>
-                      ${money(
-                        r.amount,
-                        r.currency
-                      )}
-                    </td>
+                </tr>
 
-                    <td>
-                      ${r.date}
-                    </td>
+              `)
+              .join('')
 
-                  </tr>
-
-                `
-              )
-              .join('') ||
+            ||
 
             `
               <tr>
-
                 <td
                   colspan="4"
                   class="muted"
                 >
                   No hay movimientos.
                 </td>
-
               </tr>
             `
           }
@@ -2021,6 +1821,7 @@ function closeModal() {
 function openSale() {
 
   if (!state.products.length) {
+
     return toast(
       'Primero agrega un producto'
     );
@@ -2037,7 +1838,6 @@ function openSale() {
     <div class="form">
 
       <label>
-
         Cliente
 
         <select id="fCustomer">
@@ -2046,17 +1846,21 @@ function openSale() {
             Cliente nuevo / sin registrar
           </option>
 
-          ${state.customers
-            .map(
-              c => `
-                <option value="${c.id}">
+          ${
+            state.customers
+              .map(customer => `
+
+                <option
+                  value="${customer.id}"
+                >
                   ${escapeHtml(
-                    c.name
+                    customer.name
                   )}
                 </option>
-              `
-            )
-            .join('')}
+
+              `)
+              .join('')
+          }
 
         </select>
 
@@ -2069,33 +1873,35 @@ function openSale() {
 
         <select id="fProduct">
 
-          ${state.products
-            .map(
-              p => `
+          ${
+            state.products
+              .map(product => `
 
-                <option value="${p.id}">
+                <option
+                  value="${product.id}"
+                >
 
                   ${escapeHtml(
-                    p.name
+                    product.name
                   )}
 
                   —
 
                   ${money(
-                    p.price,
-                    p.currency
+                    product.price,
+                    product.currency
                   )}
 
                   —
 
                   stock
-                  ${p.stock}
+                  ${product.stock}
 
                 </option>
 
-              `
-            )
-            .join('')}
+              `)
+              .join('')
+          }
 
         </select>
 
@@ -2159,16 +1965,18 @@ function openSale() {
   `);
 
 
-  ['fProduct', 'fQty']
-    .forEach(id => {
+  [
+    'fProduct',
+    'fQty'
+  ].forEach(id => {
 
-      $('#' + id)
-        .addEventListener(
-          'input',
-          updateSaleTotal
-        );
+    $('#' + id)
+      ?.addEventListener(
+        'input',
+        updateSaleTotal
+      );
 
-    });
+  });
 
 
   updateSaleTotal();
@@ -2176,15 +1984,15 @@ function openSale() {
 
 
 /* =========================================================
-   ACTUALIZAR TOTAL DE VENTA
+   TOTAL VENTA
    ========================================================= */
 
 function updateSaleTotal() {
 
   const product =
     state.products.find(
-      x =>
-        x.id ===
+      item =>
+        item.id ===
         $('#fProduct')?.value
     );
 
@@ -2192,13 +2000,16 @@ function updateSaleTotal() {
   if (!product) return;
 
 
+  const quantity =
+    Number(
+      $('#fQty')?.value || 1
+    );
+
+
   $('#saleTotal').textContent =
     money(
       Number(product.price) *
-        Number(
-          $('#fQty').value ||
-          1
-        ),
+      quantity,
       product.currency
     );
 
@@ -2218,15 +2029,15 @@ function updateSaleTotal() {
 
 async function createSale() {
 
-  const p =
+  const product =
     state.products.find(
-      x =>
-        x.id ===
+      item =>
+        item.id ===
         $('#fProduct').value
     );
 
 
-  const qty =
+  const quantity =
     Number(
       $('#fQty').value
     );
@@ -2244,8 +2055,8 @@ async function createSale() {
 
 
   if (
-    !p ||
-    qty <= 0
+    !product ||
+    quantity <= 0
   ) {
 
     return toast(
@@ -2255,8 +2066,8 @@ async function createSale() {
 
 
   if (
-    qty >
-    Number(p.stock)
+    quantity >
+    Number(product.stock)
   ) {
 
     return toast(
@@ -2266,16 +2077,13 @@ async function createSale() {
 
 
   const total =
-    Number(p.price) *
-    qty;
+    Number(product.price) *
+    quantity;
 
 
   const realPaid =
     Math.min(
-      Math.max(
-        paid,
-        0
-      ),
+      Math.max(paid, 0),
       total
     );
 
@@ -2292,39 +2100,38 @@ async function createSale() {
   );
 
 
-  /* VENTA */
-
   const {
     data: sale,
-    error: saleErr
-  } =
-    await db
-      .from('sales')
-      .insert({
-        customer_id:
-          customerId,
+    error: saleError
+  } = await db
+    .from('sales')
+    .insert({
 
-        total,
+      customer_id:
+        customerId,
 
-        paid:
-          realPaid,
+      total,
 
-        currency:
-          p.currency,
+      paid:
+        realPaid,
 
-        status,
+      currency:
+        product.currency,
 
-        created_by:
-          state.user.id
-      })
-      .select()
-      .single();
+      status,
+
+      created_by:
+        state.user.id
+
+    })
+    .select()
+    .single();
 
 
-  if (saleErr) {
+  if (saleError) {
 
     console.error(
-      saleErr
+      saleError
     );
 
     setSync(
@@ -2338,35 +2145,33 @@ async function createSale() {
   }
 
 
-  /* DETALLE */
-
   const {
-    error: itemErr
-  } =
-    await db
-      .from('sale_items')
-      .insert({
-        sale_id:
-          sale.id,
+    error: itemError
+  } = await db
+    .from('sale_items')
+    .insert({
 
-        product_id:
-          p.id,
+      sale_id:
+        sale.id,
 
-        quantity:
-          qty,
+      product_id:
+        product.id,
 
-        unit_price:
-          p.price,
+      quantity,
 
-        unit_cost:
-          p.cost
-      });
+      unit_price:
+        product.price,
+
+      unit_cost:
+        product.cost
+
+    });
 
 
-  if (itemErr) {
+  if (itemError) {
 
     console.error(
-      itemErr
+      itemError
     );
 
     toast(
@@ -2375,63 +2180,62 @@ async function createSale() {
   }
 
 
-  /* PAGO */
-
   if (realPaid > 0) {
 
     const {
-      error: payErr
-    } =
-      await db
-        .from('payments')
-        .insert({
-          sale_id:
-            sale.id,
+      error: paymentError
+    } = await db
+      .from('payments')
+      .insert({
 
-          amount:
-            realPaid,
+        sale_id:
+          sale.id,
 
-          currency:
-            p.currency,
+        amount:
+          realPaid,
 
-          created_by:
-            state.user.id
-        });
+        currency:
+          product.currency,
+
+        created_by:
+          state.user.id
+
+      });
 
 
-    if (payErr) {
+    if (paymentError) {
+
       console.error(
-        payErr
+        paymentError
       );
     }
   }
 
 
-  /* ACTUALIZAR STOCK */
-
   const {
-    error: stockErr
-  } =
-    await db
-      .from('products')
-      .update({
-        stock:
-          Number(p.stock) -
-          qty,
+    error: stockError
+  } = await db
+    .from('products')
+    .update({
 
-        updated_at:
-          new Date().toISOString()
-      })
-      .eq(
-        'id',
-        p.id
-      );
+      stock:
+        Number(product.stock) -
+        quantity,
+
+      updated_at:
+        new Date().toISOString()
+
+    })
+    .eq(
+      'id',
+      product.id
+    );
 
 
-  if (stockErr) {
+  if (stockError) {
 
     console.error(
-      stockErr
+      stockError
     );
 
     toast(
@@ -2453,19 +2257,23 @@ async function createSale() {
 
 
 /* =========================================================
-   ABONO
+   ABONOS
    ========================================================= */
 
 function openPayment(id) {
 
-  const s =
+  const sale =
     state.sales.find(
-      x =>
-        x.id === id
+      item => item.id === id
     );
 
 
-  if (!s) return;
+  if (!sale) return;
+
+
+  const due =
+    Number(sale.total) -
+    Number(sale.paid);
 
 
   modal(`
@@ -2479,14 +2287,14 @@ function openPayment(id) {
 
       <b>
         ${escapeHtml(
-          s.customer
+          sale.customer
         )}
       </b>
 
       ·
 
       ${escapeHtml(
-        s.id
+        sale.id
       )}
 
     </p>
@@ -2501,9 +2309,8 @@ function openPayment(id) {
       <div class="metric orange">
 
         ${money(
-          Number(s.total) -
-            Number(s.paid),
-          s.currency
+          due,
+          sale.currency
         )}
 
       </div>
@@ -2521,10 +2328,7 @@ function openPayment(id) {
           id="payAmount"
           type="number"
           min="0.01"
-          max="${
-            Number(s.total) -
-            Number(s.paid)
-          }"
+          max="${due}"
           step="0.01"
         >
 
@@ -2533,7 +2337,7 @@ function openPayment(id) {
 
       <button
         class="primary"
-        onclick="addPayment('${s.id}')"
+        onclick="addPayment('${sale.id}')"
       >
         REGISTRAR ABONO Y COMPROBANTE
       </button>
@@ -2545,16 +2349,18 @@ function openPayment(id) {
 
 
 /* =========================================================
-   AGREGAR ABONO
+   AGREGAR PAGO
    ========================================================= */
 
 async function addPayment(id) {
 
-  const s =
+  const sale =
     state.sales.find(
-      x =>
-        x.id === id
+      item => item.id === id
     );
+
+
+  if (!sale) return;
 
 
   const amount =
@@ -2563,12 +2369,9 @@ async function addPayment(id) {
     );
 
 
-  if (!s) return;
-
-
   const due =
-    Number(s.total) -
-    Number(s.paid);
+    Number(sale.total) -
+    Number(sale.paid);
 
 
   if (
@@ -2584,28 +2387,28 @@ async function addPayment(id) {
 
 
   const {
-    error: payErr
-  } =
-    await db
-      .from('payments')
-      .insert({
-        sale_id:
-          id,
+    error: paymentError
+  } = await db
+    .from('payments')
+    .insert({
 
-        amount,
+      sale_id: id,
 
-        currency:
-          s.currency,
+      amount,
 
-        created_by:
-          state.user.id
-      });
+      currency:
+        sale.currency,
+
+      created_by:
+        state.user.id
+
+    });
 
 
-  if (payErr) {
+  if (paymentError) {
 
     console.error(
-      payErr
+      paymentError
     );
 
     return toast(
@@ -2615,35 +2418,36 @@ async function addPayment(id) {
 
 
   const newPaid =
-    Number(s.paid) +
+    Number(sale.paid) +
     amount;
 
 
   const {
-    error: saleErr
-  } =
-    await db
-      .from('sales')
-      .update({
-        paid:
-          newPaid,
+    error: saleError
+  } = await db
+    .from('sales')
+    .update({
 
-        status:
-          newPaid >=
-          Number(s.total)
-            ? 'paid'
-            : 'pending'
-      })
-      .eq(
-        'id',
-        id
-      );
+      paid:
+        newPaid,
+
+      status:
+        newPaid >=
+        Number(sale.total)
+          ? 'paid'
+          : 'pending'
+
+    })
+    .eq(
+      'id',
+      id
+    );
 
 
-  if (saleErr) {
+  if (saleError) {
 
     console.error(
-      saleErr
+      saleError
     );
 
     return toast(
@@ -2657,8 +2461,7 @@ async function addPayment(id) {
 
   const updated =
     state.sales.find(
-      x =>
-        x.id === id
+      item => item.id === id
     );
 
 
@@ -2673,35 +2476,26 @@ async function addPayment(id) {
 
 
 /* =========================================================
-   TEXTO DEL COMPROBANTE
+   COMPROBANTE
    ========================================================= */
 
 function receiptText(
-  s,
+  sale,
   amount
 ) {
 
   return `HYPEFRIENDS BUSINESS
 COMPROBANTE DE PAGO
 
-Cliente: ${s.customer}
-Venta: ${s.id}
-Pago recibido: ${money(
-    amount,
-    s.currency
-  )}
-Total compra: ${money(
-    s.total,
-    s.currency
-  )}
-Total abonado: ${money(
-    s.paid,
-    s.currency
-  )}
+Cliente: ${sale.customer}
+Venta: ${sale.id}
+Pago recibido: ${money(amount, sale.currency)}
+Total compra: ${money(sale.total, sale.currency)}
+Total abonado: ${money(sale.paid, sale.currency)}
 Saldo pendiente: ${money(
-    Number(s.total) -
-      Number(s.paid),
-    s.currency
+    Number(sale.total) -
+    Number(sale.paid),
+    sale.currency
   )}
 
 SIN INTERESES
@@ -2709,12 +2503,8 @@ Gracias por comprar en HYPEFRIENDS.`;
 }
 
 
-/* =========================================================
-   MOSTRAR COMPROBANTE
-   ========================================================= */
-
 function showReceipt(
-  s,
+  sale,
   amount
 ) {
 
@@ -2738,80 +2528,45 @@ function showReceipt(
 
 
       <div class="receipt-row">
-
-        <span>
-          Cliente
-        </span>
-
-        <b>
-          ${escapeHtml(
-            s.customer
-          )}
-        </b>
-
+        <span>Cliente</span>
+        <b>${escapeHtml(
+          sale.customer
+        )}</b>
       </div>
 
 
       <div class="receipt-row">
-
-        <span>
-          Venta
-        </span>
-
-        <b>
-          ${escapeHtml(
-            s.id
-          )}
-        </b>
-
+        <span>Venta</span>
+        <b>${escapeHtml(
+          sale.id
+        )}</b>
       </div>
 
 
       <div class="receipt-row">
-
-        <span>
-          Pago recibido
-        </span>
-
-        <b>
-          ${money(
-            amount,
-            s.currency
-          )}
-        </b>
-
+        <span>Pago recibido</span>
+        <b>${money(
+          amount,
+          sale.currency
+        )}</b>
       </div>
 
 
       <div class="receipt-row">
-
-        <span>
-          Total compra
-        </span>
-
-        <b>
-          ${money(
-            s.total,
-            s.currency
-          )}
-        </b>
-
+        <span>Total compra</span>
+        <b>${money(
+          sale.total,
+          sale.currency
+        )}</b>
       </div>
 
 
       <div class="receipt-row">
-
-        <span>
-          Total abonado
-        </span>
-
-        <b>
-          ${money(
-            s.paid,
-            s.currency
-          )}
-        </b>
-
+        <span>Total abonado</span>
+        <b>${money(
+          sale.paid,
+          sale.currency
+        )}</b>
       </div>
 
 
@@ -2827,9 +2582,9 @@ function showReceipt(
         <b class="receipt-total">
 
           ${money(
-            Number(s.total) -
-              Number(s.paid),
-            s.currency
+            Number(sale.total) -
+            Number(sale.paid),
+            sale.currency
           )}
 
         </b>
@@ -2843,6 +2598,7 @@ function showReceipt(
       <b>
         SIN INTERESES
       </b>
+
 
       <p class="muted">
         Gracias por comprar en HYPEFRIENDS.
@@ -2859,7 +2615,7 @@ function showReceipt(
       <button
         class="primary"
         onclick="shareReceiptImage(
-          '${s.id}',
+          '${sale.id}',
           ${Number(amount)}
         )"
       >
@@ -2870,7 +2626,7 @@ function showReceipt(
       <button
         class="outline light-button"
         onclick="shareReceiptText(
-          '${s.id}',
+          '${sale.id}',
           ${Number(amount)}
         )"
       >
@@ -2892,11 +2648,11 @@ function showReceipt(
 
 
 /* =========================================================
-   CANVAS DEL COMPROBANTE
+   IMAGEN COMPROBANTE
    ========================================================= */
 
 function buildReceiptCanvas(
-  s,
+  sale,
   amount
 ) {
 
@@ -2911,13 +2667,10 @@ function buildReceiptCanvas(
 
 
   const ctx =
-    canvas.getContext(
-      '2d'
-    );
+    canvas.getContext('2d');
 
 
-  ctx.fillStyle =
-    '#ffffff';
+  ctx.fillStyle = '#ffffff';
 
   ctx.fillRect(
     0,
@@ -2927,11 +2680,9 @@ function buildReceiptCanvas(
   );
 
 
-  ctx.fillStyle =
-    '#090909';
+  ctx.fillStyle = '#090909';
 
-  ctx.textAlign =
-    'left';
+  ctx.textAlign = 'left';
 
 
   ctx.font =
@@ -2984,44 +2735,44 @@ function buildReceiptCanvas(
 
     [
       'Cliente',
-      s.customer
+      sale.customer
     ],
 
     [
       'Venta',
-      s.id
+      sale.id
     ],
 
     [
       'Pago recibido',
       money(
         amount,
-        s.currency
+        sale.currency
       )
     ],
 
     [
       'Total compra',
       money(
-        s.total,
-        s.currency
+        sale.total,
+        sale.currency
       )
     ],
 
     [
       'Total abonado',
       money(
-        s.paid,
-        s.currency
+        sale.paid,
+        sale.currency
       )
     ],
 
     [
       'Saldo pendiente',
       money(
-        Number(s.total) -
-          Number(s.paid),
-        s.currency
+        Number(sale.total) -
+        Number(sale.paid),
+        sale.currency
       )
     ]
 
@@ -3036,13 +2787,13 @@ function buildReceiptCanvas(
 
 
   rows.forEach(
-    ([a, b], i) => {
+    ([label, value], index) => {
 
       ctx.fillStyle =
         '#777';
 
       ctx.fillText(
-        a,
+        label,
         60,
         y
       );
@@ -3053,28 +2804,22 @@ function buildReceiptCanvas(
 
 
       ctx.font =
-        i === 5
+        index === 5
           ? '900 38px Arial'
           : '700 26px Arial';
 
 
       ctx.fillText(
-        String(b),
+        String(value),
         840,
         y
       );
 
 
-      ctx.textAlign =
-        'left';
-
-
       y += 95;
-
 
       ctx.font =
         '500 25px Arial';
-
     }
   );
 
@@ -3130,28 +2875,23 @@ function buildReceiptCanvas(
 }
 
 
-/* =========================================================
-   COMPARTIR IMAGEN
-   ========================================================= */
-
 async function shareReceiptImage(
   id,
   amount
 ) {
 
-  const s =
+  const sale =
     state.sales.find(
-      x =>
-        x.id === id
+      item => item.id === id
     );
 
 
-  if (!s) return;
+  if (!sale) return;
 
 
   const canvas =
     buildReceiptCanvas(
-      s,
+      sale,
       amount
     );
 
@@ -3190,54 +2930,51 @@ async function shareReceiptImage(
 
             text:
               receiptText(
-                s,
+                sale,
                 amount
               ),
 
-            files: [
-              file
-            ]
+            files: [file]
           });
-
 
           toast(
             'Comprobante listo para compartir'
           );
 
-        } catch (e) {}
+        } catch (error) {}
 
       } else {
 
-        const a =
+        const link =
           document.createElement(
             'a'
           );
 
 
-        a.href =
+        link.href =
           URL.createObjectURL(
             blob
           );
 
 
-        a.download =
+        link.download =
           `HYPEFRIENDS-${id}.png`;
 
 
-        a.click();
+        link.click();
 
 
         setTimeout(
           () =>
             URL.revokeObjectURL(
-              a.href
+              link.href
             ),
           1000
         );
 
 
         toast(
-          'Imagen generada; puedes enviarla por WhatsApp'
+          'Imagen generada'
         );
       }
 
@@ -3247,28 +2984,23 @@ async function shareReceiptImage(
 }
 
 
-/* =========================================================
-   COMPARTIR TEXTO
-   ========================================================= */
-
 async function shareReceiptText(
   id,
   amount
 ) {
 
-  const s =
+  const sale =
     state.sales.find(
-      x =>
-        x.id === id
+      item => item.id === id
     );
 
 
-  if (!s) return;
+  if (!sale) return;
 
 
   const text =
     receiptText(
-      s,
+      sale,
       amount
     );
 
@@ -3280,13 +3012,12 @@ async function shareReceiptText(
       await navigator.share({
         title:
           'Comprobante HYPEFRIENDS',
-
         text
       });
 
       return;
 
-    } catch (e) {}
+    } catch (error) {}
   }
 
 
@@ -3296,13 +3027,13 @@ async function shareReceiptText(
 
 
   toast(
-    'Comprobante copiado; pégalo en WhatsApp'
+    'Comprobante copiado'
   );
 }
 
 
 /* =========================================================
-   NUEVO PRODUCTO
+   PRODUCTOS
    ========================================================= */
 
 function openProduct() {
@@ -3317,33 +3048,28 @@ function openProduct() {
     <div class="form">
 
       <label>
-
         Nombre
 
         <input
           id="pName"
           required
         >
-
       </label>
 
 
       <div class="form-grid">
 
         <label>
-
           Categoría
 
           <input
             id="pCat"
             value="General"
           >
-
         </label>
 
 
         <label>
-
           Stock
 
           <input
@@ -3352,12 +3078,10 @@ function openProduct() {
             value="1"
             min="0"
           >
-
         </label>
 
 
         <label>
-
           Costo
 
           <input
@@ -3367,12 +3091,10 @@ function openProduct() {
             min="0"
             step="0.01"
           >
-
         </label>
 
 
         <label>
-
           Precio
 
           <input
@@ -3382,7 +3104,6 @@ function openProduct() {
             min="0"
             step="0.01"
           >
-
         </label>
 
       </div>
@@ -3420,10 +3141,6 @@ function openProduct() {
 }
 
 
-/* =========================================================
-   CREAR PRODUCTO
-   ========================================================= */
-
 async function createProduct() {
 
   const row = {
@@ -3453,23 +3170,19 @@ async function createProduct() {
 
     currency:
       $('#pCurrency').value
-
   };
 
 
   const {
     error
-  } =
-    await db
-      .from('products')
-      .insert(row);
+  } = await db
+    .from('products')
+    .insert(row);
 
 
   if (error) {
 
-    console.error(
-      error
-    );
+    console.error(error);
 
     return toast(
       'No se pudo guardar el producto'
@@ -3481,10 +3194,7 @@ async function createProduct() {
 
   closeModal();
 
-  render(
-    'inventory'
-  );
-
+  render('inventory');
 
   toast(
     'PRODUCTO GUARDADO EN LA NUBE'
@@ -3493,7 +3203,7 @@ async function createProduct() {
 
 
 /* =========================================================
-   NUEVO GASTO
+   GASTOS
    ========================================================= */
 
 function openExpense() {
@@ -3565,10 +3275,6 @@ function openExpense() {
 }
 
 
-/* =========================================================
-   CREAR GASTO
-   ========================================================= */
-
 async function createExpense() {
 
   const row = {
@@ -3590,9 +3296,7 @@ async function createExpense() {
   };
 
 
-  if (
-    row.amount <= 0
-  ) {
+  if (row.amount <= 0) {
 
     return toast(
       'Monto inválido'
@@ -3602,17 +3306,14 @@ async function createExpense() {
 
   const {
     error
-  } =
-    await db
-      .from('expenses')
-      .insert(row);
+  } = await db
+    .from('expenses')
+    .insert(row);
 
 
   if (error) {
 
-    console.error(
-      error
-    );
+    console.error(error);
 
     return toast(
       'No se pudo guardar el gasto'
@@ -3624,10 +3325,7 @@ async function createExpense() {
 
   closeModal();
 
-  render(
-    'finance'
-  );
-
+  render('finance');
 
   toast(
     'GASTO REGISTRADO EN LA NUBE'
@@ -3636,7 +3334,7 @@ async function createExpense() {
 
 
 /* =========================================================
-   NUEVO CLIENTE
+   CLIENTES
    ========================================================= */
 
 function openCustomer() {
@@ -3699,10 +3397,6 @@ function openCustomer() {
 }
 
 
-/* =========================================================
-   CREAR CLIENTE
-   ========================================================= */
-
 async function createCustomer() {
 
   const row = {
@@ -3718,23 +3412,19 @@ async function createCustomer() {
     email:
       $('#cEmail').value.trim() ||
       null
-
   };
 
 
   const {
     error
-  } =
-    await db
-      .from('customers')
-      .insert(row);
+  } = await db
+    .from('customers')
+    .insert(row);
 
 
   if (error) {
 
-    console.error(
-      error
-    );
+    console.error(error);
 
     return toast(
       'No se pudo guardar el cliente'
@@ -3746,10 +3436,7 @@ async function createCustomer() {
 
   closeModal();
 
-  render(
-    'customers'
-  );
-
+  render('customers');
 
   toast(
     'CLIENTE GUARDADO EN LA NUBE'
@@ -3766,12 +3453,11 @@ let deferredPrompt;
 
 window.addEventListener(
   'beforeinstallprompt',
-  e => {
+  event => {
 
-    e.preventDefault();
+    event.preventDefault();
 
-    deferredPrompt = e;
-
+    deferredPrompt = event;
   }
 );
 
@@ -3794,7 +3480,7 @@ async function installApp() {
 
 
 /* =========================================================
-   INICIAR
+   INICIO
    ========================================================= */
 
 boot();
