@@ -1,7 +1,7 @@
 const LEGACY_MIGRATION_KEY = 'hf_supabase_legacy_migration_v1';
 
-async function stableLegacyId(userId, entity, legacyId) {
-  const input = new TextEncoder().encode(`${userId}:${entity}:${legacyId}`);
+async function stableLegacyId(entity, legacyId) {
+  const input = new TextEncoder().encode(`${entity}:${legacyId}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input)).slice(0, 16);
   digest[6] = (digest[6] & 0x0f) | 0x50;
   digest[8] = (digest[8] & 0x3f) | 0x80;
@@ -54,14 +54,14 @@ async function migrateLegacyLocalData(session) {
     if (!normalized) return null;
     const key = normalized.toLocaleLowerCase();
     if (customersByName.has(key)) return customersByName.get(key);
-    const id = await stableLegacyId(userId, 'customer', key);
+    const id = await stableLegacyId('customer', key);
     customersByName.set(key, id);
     customerRows.push({ id, name: normalized });
     return id;
   };
 
   const productRows = await Promise.all(inventory.map(async (product, index) => ({
-    id: await stableLegacyId(userId, 'product', product.id ?? `${product.name}-${product.size}-${index}`),
+    id: await stableLegacyId('product', product.id ?? `${product.name}-${product.size}-${index}`),
     name: String(product.name || 'Producto'),
     category: String(product.category || 'General'),
     size: product.size ? String(product.size) : null,
@@ -79,7 +79,7 @@ async function migrateLegacyLocalData(session) {
     for (let index = 0; index < records.length; index += 1) {
       const record = records[index];
       const legacyId = record.id ?? `${record.item}-${record.fecha}-${index}`;
-      const id = await stableLegacyId(userId, kind, legacyId);
+      const id = await stableLegacyId(kind, legacyId);
       const total = Number(kind === 'sale' ? record.price : record.total);
       const paid = kind === 'sale' ? total : Number(record.abonado || 0);
       const customerId = await getCustomerId(record.cliente);
@@ -96,7 +96,7 @@ async function migrateLegacyLocalData(session) {
         created_at: createdAt
       });
       saleItemRows.push({
-        id: await stableLegacyId(userId, `${kind}-item`, legacyId),
+        id: await stableLegacyId(`${kind}-item`, legacyId),
         sale_id: id,
         quantity: 1,
         unit_price: total,
@@ -104,7 +104,7 @@ async function migrateLegacyLocalData(session) {
       });
       if (paid > 0) {
         paymentRows.push({
-          id: await stableLegacyId(userId, `${kind}-payment`, legacyId),
+          id: await stableLegacyId(`${kind}-payment`, legacyId),
           sale_id: id,
           amount: paid,
           currency: 'USD',
@@ -116,7 +116,7 @@ async function migrateLegacyLocalData(session) {
   }
 
   const expenseRows = await Promise.all(expenses.map(async (expense, index) => ({
-    id: await stableLegacyId(userId, 'expense', expense.id ?? `${expense.concepto}-${expense.fecha}-${index}`),
+    id: await stableLegacyId('expense', expense.id ?? `${expense.concepto}-${expense.fecha}-${index}`),
     note: String(expense.concepto || 'Gasto'),
     amount: Number(expense.monto || 0),
     currency: 'USD',

@@ -11,5 +11,8 @@ Si las tablas todavía no están creadas, ejecuta `supabase.sql` en Supabase SQL
 ## Usuarios
 Los dos socios deben existir en Supabase Authentication → Users. Ingresan con su correo y contraseña. Ambos trabajan sobre los mismos datos del negocio mediante RLS para usuarios autenticados.
 
+## Sincronización y datos anteriores
+Los cambios nuevos se guardan en Supabase y se sincronizan entre dispositivos. Al iniciar sesión por primera vez en cada navegador, la app importa a Supabase los datos locales antiguos de inventario, ventas, apartados y gastos. La copia local no se elimina.
+
 ## Publicación
 Sube todos los archivos de esta carpeta a un hosting HTTPS estático como Vercel, Netlify, Cloudflare Pages o GitHub Pages. Para que la instalación PWA y el login funcionen correctamente, la URL pública debe usar HTTPS.
