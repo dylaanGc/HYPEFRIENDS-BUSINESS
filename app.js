@@ -1,34 +1,49 @@
 /* =========================================================
    HYPEFRIENDS BUSINESS
-   SUPABASE + MULTI DISPOSITIVO + REALTIME + AUTO SYNC
+   SUPABASE + REALTIME + PWA
    ========================================================= */
 
-const SUPABASE_URL = 'https://ynowgseafpcfgvsmkub.supabase.co';
+
+/* =========================================================
+   SUPABASE
+   ========================================================= */
+
+const SUPABASE_URL =
+  'https://ynowgseafpcfgvsmkub.supabase.co';
 
 const SUPABASE_PUBLISHABLE_KEY =
   'sb_publishable_2DSB2bN-_Q4JAm5WO4QruA_E4sXrEuH';
 
 
-// =========================================================
-// SUPABASE
-// =========================================================
+/* =========================================================
+   COMPROBAR SUPABASE
+   ========================================================= */
 
 if (
   !window.supabase ||
   typeof window.supabase.createClient !== 'function'
 ) {
+
   document.addEventListener('DOMContentLoaded', () => {
+
     const el = document.querySelector('#loginError');
 
     if (el) {
+
       el.textContent =
-        'No se pudo cargar Supabase. Recarga la página.';
+        'No se pudo cargar Supabase. Comprueba que index.html cargue correctamente la librería de Supabase.';
     }
+
   });
 
   throw new Error('Supabase JS no cargó');
+
 }
 
+
+/* =========================================================
+   CLIENTE SUPABASE
+   ========================================================= */
 
 const db = window.supabase.createClient(
   SUPABASE_URL,
@@ -38,20 +53,14 @@ const db = window.supabase.createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true
-    },
-
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
     }
   }
 );
 
 
-// =========================================================
-// ESTADO
-// =========================================================
+/* =========================================================
+   ESTADO
+   ========================================================= */
 
 const state = {
 
@@ -69,18 +78,14 @@ const state = {
 
   view: 'dashboard',
 
-  realtime: null,
-
-  syncTimer: null,
-
-  loading: false
+  realtime: null
 
 };
 
 
-// =========================================================
-// PRODUCTOS INICIALES
-// =========================================================
+/* =========================================================
+   PRODUCTOS INICIALES
+   ========================================================= */
 
 const DEFAULT_PRODUCTS = [
 
@@ -123,9 +128,9 @@ const DEFAULT_PRODUCTS = [
 ];
 
 
-// =========================================================
-// UTILIDADES
-// =========================================================
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
 
 const $ = selector =>
   document.querySelector(selector);
@@ -133,20 +138,22 @@ const $ = selector =>
 
 const money = (n, currency = 'CRC') => {
 
-  const value = Number(n || 0);
-
   if (currency === 'USD') {
 
     return '$' +
-      value.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
+      Number(n || 0).toLocaleString(
+        'en-US',
+        {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }
+      );
 
   }
 
   return '₡' +
-    Math.round(value).toLocaleString('es-CR');
+    Math.round(Number(n || 0))
+      .toLocaleString('es-CR');
 
 };
 
@@ -155,39 +162,45 @@ const today = () =>
   new Date().toISOString().slice(0, 10);
 
 
-const escapeHtml = value =>
-  String(value ?? '').replace(
-    /[&<>'"]/g,
-    ch => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[ch])
-  );
+const escapeHtml = value => {
+
+  return String(value ?? '')
+    .replace(
+      /[&<>'"]/g,
+      character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      })[character]
+    );
+
+};
 
 
 const toast = message => {
 
-  const t = $('#toast');
+  const element = $('#toast');
 
-  if (!t) return;
+  if (!element) return;
 
-  t.textContent = message;
+  element.textContent = message;
 
-  t.classList.add('show');
+  element.classList.add('show');
 
   setTimeout(() => {
-    t.classList.remove('show');
+
+    element.classList.remove('show');
+
   }, 2200);
 
 };
 
 
-// =========================================================
-// ESTADO DE SINCRONIZACIÓN
-// =========================================================
+/* =========================================================
+   INDICADOR DE SINCRONIZACIÓN
+   ========================================================= */
 
 function setSync(ok, text) {
 
@@ -211,104 +224,73 @@ function setSync(ok, text) {
 }
 
 
-// =========================================================
-// LOGIN
-// =========================================================
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
 function showLogin(show = true) {
 
-  const login = $('#loginScreen');
+  $('#loginScreen')?.classList.toggle(
+    'hidden',
+    !show
+  );
 
-  const app = $('#app');
+  $('#app')?.classList.toggle(
+    'app-visible',
+    !show
+  );
 
-  if (login) {
-
-    login.classList.toggle(
-      'hidden',
-      !show
-    );
-
-  }
-
-  if (app) {
-
-    app.classList.toggle(
-      'app-visible',
-      !show
-    );
-
-    app.classList.toggle(
-      'hidden-app',
-      show
-    );
-
-  }
+  $('#app')?.classList.toggle(
+    'hidden-app',
+    show
+  );
 
 }
 
 
-// =========================================================
-// BOOT
-// =========================================================
+/* =========================================================
+   BOOT
+   ========================================================= */
 
 async function boot() {
 
-  console.log('================================');
-  console.log('HYPEFRIENDS BUSINESS');
-  console.log('Supabase iniciado');
-  console.log('URL:', SUPABASE_URL);
-  console.log('================================');
+  console.log('🚀 HYPEFRIENDS BUSINESS iniciando...');
+
+  console.log(
+    '🌐 Supabase:',
+    SUPABASE_URL
+  );
 
 
-  const loginForm = $('#loginForm');
+  /* Botones */
 
-  if (loginForm) {
+  $('#loginForm')?.addEventListener(
+    'submit',
+    login
+  );
 
-    loginForm.addEventListener(
-      'submit',
-      login
-    );
+  $('#logoutBtn')?.addEventListener(
+    'click',
+    logout
+  );
 
-  }
+  if ($('#closeModal')) {
 
-
-  const logoutBtn = $('#logoutBtn');
-
-  if (logoutBtn) {
-
-    logoutBtn.addEventListener(
-      'click',
-      logout
-    );
-
-  }
-
-
-  const closeModalBtn = $('#closeModal');
-
-  if (closeModalBtn) {
-
-    closeModalBtn.onclick =
+    $('#closeModal').onclick =
       closeModal;
 
   }
 
+  if ($('#newSaleBtn')) {
 
-  const newSaleBtn = $('#newSaleBtn');
-
-  if (newSaleBtn) {
-
-    newSaleBtn.onclick =
+    $('#newSaleBtn').onclick =
       openSale;
 
   }
 
+  if ($('#installBtn')) {
 
-  const installBtn = $('#installBtn');
-
-  if (installBtn) {
-
-    installBtn.onclick =
+    $('#installBtn').onclick =
       installApp;
 
   }
@@ -318,46 +300,75 @@ async function boot() {
     .querySelectorAll('.nav')
     .forEach(button => {
 
-      button.onclick = () =>
-        render(button.dataset.view);
+      button.onclick = () => {
+
+        render(
+          button.dataset.view
+        );
+
+      };
 
     });
 
 
-  // -------------------------------------------------------
-  // SESIÓN
-  // -------------------------------------------------------
+  /* Recuperar sesión */
 
-  const {
-    data: {
-      session
+  try {
+
+    const {
+      data: { session },
+      error
+    } = await db.auth.getSession();
+
+
+    if (error) {
+
+      console.error(
+        '❌ Error obteniendo sesión:',
+        error
+      );
+
     }
-  } = await db.auth.getSession();
 
 
-  console.log(
-    'Sesión encontrada:',
-    !!session
-  );
+    if (session) {
 
+      console.log(
+        '✅ Sesión encontrada:',
+        session.user.email
+      );
 
-  if (session) {
+      await startApp(session);
 
-    await startApp(session);
+    } else {
+
+      console.log(
+        'ℹ️ No hay sesión activa'
+      );
+
+      showLogin(true);
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error de inicio:',
+      error
+    );
 
   }
 
 
-  // -------------------------------------------------------
-  // CAMBIOS DE LOGIN
-  // -------------------------------------------------------
+  /* Auth listener */
 
   db.auth.onAuthStateChange(
     (_event, sessionNow) => {
 
       console.log(
-        'Auth:',
-        _event
+        '🔐 Auth:',
+        _event,
+        sessionNow?.user?.email || 'sin sesión'
       );
 
 
@@ -368,7 +379,7 @@ async function boot() {
           if (
             !state.session ||
             state.session.access_token !==
-            sessionNow.access_token
+              sessionNow.access_token
           ) {
 
             startApp(sessionNow);
@@ -387,9 +398,7 @@ async function boot() {
   );
 
 
-  // -------------------------------------------------------
-  // SERVICE WORKER
-  // -------------------------------------------------------
+  /* Service Worker */
 
   if ('serviceWorker' in navigator) {
 
@@ -404,16 +413,38 @@ async function boot() {
         );
 
       console.log(
-        'Service Worker:',
-        registration
+        '✅ Service Worker registrado:',
+        registration.scope
       );
 
-      await registration.update();
+
+      /*
+        Buscar actualización inmediatamente.
+      */
+
+      registration.update();
+
+
+      /*
+        Si hay nuevo Service Worker,
+        recargar cuando tome control.
+      */
+
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        () => {
+
+          console.log(
+            '🔄 Nuevo Service Worker activo'
+          );
+
+        }
+      );
 
     } catch (error) {
 
       console.error(
-        'Error Service Worker:',
+        '❌ Error Service Worker:',
         error
       );
 
@@ -424,38 +455,30 @@ async function boot() {
 }
 
 
-// =========================================================
-// LOGIN
-// =========================================================
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
-async function login(e) {
+async function login(event) {
 
-  e.preventDefault();
+  event.preventDefault();
 
 
   const email =
     $('#loginEmail')?.value.trim();
 
   const password =
-    $('#loginPassword')?.value;
+    $('#loginPassword')?.value || '';
 
 
-  if ($('#loginError')) {
-
-    $('#loginError').textContent =
-      'Conectando...';
-
-  }
+  $('#loginError').textContent =
+    'Conectando...';
 
 
   if (!email || !password) {
 
-    if ($('#loginError')) {
-
-      $('#loginError').textContent =
-        'Escribe el correo y la contraseña.';
-
-    }
+    $('#loginError').textContent =
+      'Escribe el correo y la contraseña.';
 
     return;
 
@@ -468,23 +491,49 @@ async function login(e) {
       data,
       error
     } = await db.auth.signInWithPassword({
+
       email,
+
       password
+
     });
 
 
     if (error) {
 
       console.error(
-        'Supabase login:',
+        '❌ Supabase login:',
         error
       );
 
 
-      if ($('#loginError')) {
+      const message =
+        String(error.message || '')
+          .toLowerCase();
+
+
+      if (
+        message.includes(
+          'email not confirmed'
+        )
+      ) {
 
         $('#loginError').textContent =
-          error.message;
+          'Este correo todavía no está confirmado en Supabase.';
+
+      } else if (
+        message.includes(
+          'invalid login credentials'
+        )
+      ) {
+
+        $('#loginError').textContent =
+          'Correo o contraseña incorrectos.';
+
+      } else {
+
+        $('#loginError').textContent =
+          `Error de Supabase: ${error.message}`;
 
       }
 
@@ -494,51 +543,54 @@ async function login(e) {
 
 
     console.log(
-      'Login correcto'
+      '✅ Login correcto'
     );
+
+
+    $('#loginError').textContent =
+      '✓ Acceso correcto.';
 
 
     if (data?.session) {
 
-      await startApp(
-        data.session
-      );
+      await startApp(data.session);
 
     }
 
   } catch (error) {
 
     console.error(
+      '❌ Login exception:',
       error
     );
 
-
-    if ($('#loginError')) {
-
-      $('#loginError').textContent =
-        error.message ||
-        'Error inesperado';
-
-    }
+    $('#loginError').textContent =
+      `Error inesperado: ${error.message || error}`;
 
   }
 
 }
 
 
-// =========================================================
-// LOGOUT
-// =========================================================
+/* =========================================================
+   LOGOUT
+   ========================================================= */
 
 async function logout() {
 
-  stopAutoSync();
-
   if (state.realtime) {
 
-    await db.removeChannel(
-      state.realtime
-    );
+    try {
+
+      await db.removeChannel(
+        state.realtime
+      );
+
+    } catch (error) {
+
+      console.warn(error);
+
+    }
 
     state.realtime = null;
 
@@ -550,14 +602,14 @@ async function logout() {
 }
 
 
-// =========================================================
-// START APP
-// =========================================================
+/* =========================================================
+   INICIAR APP
+   ========================================================= */
 
 async function startApp(session) {
 
   console.log(
-    'Iniciando aplicación...'
+    '🚀 Iniciando aplicación'
   );
 
 
@@ -566,17 +618,8 @@ async function startApp(session) {
   state.user = session.user;
 
 
-  const email =
-    state.user.email ||
-    'Usuario';
-
-
-  if ($('#userEmail')) {
-
-    $('#userEmail').textContent =
-      email;
-
-  }
+  $('#userEmail').textContent =
+    state.user.email || 'Usuario';
 
 
   showLogin(false);
@@ -594,10 +637,12 @@ async function startApp(session) {
   await loadAll();
 
 
+  /*
+    IMPORTANTE:
+    conectar Realtime DESPUÉS de cargar datos.
+  */
+
   subscribeRealtime();
-
-
-  startAutoSync();
 
 
   render(state.view);
@@ -608,21 +653,18 @@ async function startApp(session) {
     'Sincronizado con Supabase'
   );
 
-
-  console.log(
-    'Aplicación lista'
-  );
-
 }
 
 
-// =========================================================
-// STOP APP
-// =========================================================
+/* =========================================================
+   DETENER APP
+   ========================================================= */
 
 function stopApp() {
 
-  stopAutoSync();
+  console.log(
+    '🛑 Cerrando aplicación'
+  );
 
 
   if (state.realtime) {
@@ -654,9 +696,9 @@ function stopApp() {
 }
 
 
-// =========================================================
-// PERFIL
-// =========================================================
+/* =========================================================
+   PERFIL
+   ========================================================= */
 
 async function ensureProfile() {
 
@@ -685,7 +727,7 @@ async function ensureProfile() {
   if (error) {
 
     console.warn(
-      'Profile:',
+      '⚠️ Profile:',
       error.message
     );
 
@@ -694,32 +736,24 @@ async function ensureProfile() {
 }
 
 
-// =========================================================
-// CARGAR TODO
-// =========================================================
+/* =========================================================
+   CARGAR TODOS LOS DATOS
+   ========================================================= */
 
 async function loadAll() {
 
-  if (!state.user) return;
+  console.log(
+    '☁️ Cargando datos desde Supabase...'
+  );
 
 
-  if (state.loading) {
-
-    return;
-
-  }
-
-
-  state.loading = true;
+  setSync(
+    true,
+    'Cargando datos...'
+  );
 
 
   try {
-
-    setSync(
-      true,
-      'Actualizando datos...'
-    );
-
 
     const [
 
@@ -781,53 +815,36 @@ async function loadAll() {
     ]);
 
 
-    // -----------------------------------------------------
-    // ERRORES
-    // -----------------------------------------------------
+    const error =
+      productsResult.error ||
+      customersResult.error ||
+      expensesResult.error ||
+      salesResult.error;
 
-    if (productsResult.error) {
+
+    if (error) {
 
       console.error(
-        'PRODUCTS ERROR:',
-        productsResult.error
+        '❌ Error cargando datos:',
+        error
       );
+
+
+      setSync(
+        false,
+        'Error de conexión'
+      );
+
+
+      toast(
+        'No se pudieron cargar los datos'
+      );
+
+
+      return;
 
     }
 
-
-    if (customersResult.error) {
-
-      console.error(
-        'CUSTOMERS ERROR:',
-        customersResult.error
-      );
-
-    }
-
-
-    if (expensesResult.error) {
-
-      console.error(
-        'EXPENSES ERROR:',
-        expensesResult.error
-      );
-
-    }
-
-
-    if (salesResult.error) {
-
-      console.error(
-        'SALES ERROR:',
-        salesResult.error
-      );
-
-    }
-
-
-    // -----------------------------------------------------
-    // GUARDAR ESTADO
-    // -----------------------------------------------------
 
     state.products =
       productsResult.data || [];
@@ -842,8 +859,8 @@ async function loadAll() {
 
 
     state.sales =
-      (salesResult.data || []).map(
-        sale => ({
+      (salesResult.data || [])
+        .map(sale => ({
 
           ...sale,
 
@@ -855,84 +872,71 @@ async function loadAll() {
             (sale.payments || [])
               .sort(
                 (a, b) =>
-                  String(
-                    a.created_at
-                  ).localeCompare(
-                    String(
-                      b.created_at
+                  String(a.created_at)
+                    .localeCompare(
+                      String(b.created_at)
                     )
-                  )
               )
 
-        })
-      );
+        }));
 
 
-    // -----------------------------------------------------
-    // PRODUCTOS INICIALES
-    // -----------------------------------------------------
+    console.log(
+      '✅ Datos cargados:',
+      {
+        products: state.products.length,
+        customers: state.customers.length,
+        expenses: state.expenses.length,
+        sales: state.sales.length
+      }
+    );
 
-    if (
-      !state.products.length
-    ) {
+
+    /*
+      Solo crear productos iniciales
+      si realmente no existe ninguno.
+    */
+
+    if (!state.products.length) {
 
       await seedProducts();
 
     }
 
 
-    console.log(
-      'Datos cargados:',
-      {
-        products:
-          state.products.length,
-
-        customers:
-          state.customers.length,
-
-        expenses:
-          state.expenses.length,
-
-        sales:
-          state.sales.length
-      }
-    );
-
-
     setSync(
       true,
-      'Sincronizado'
+      'Datos actualizados'
     );
-
 
   } catch (error) {
 
     console.error(
-      'LOAD ALL ERROR:',
+      '❌ loadAll exception:',
       error
     );
 
 
     setSync(
       false,
-      'Error de sincronización'
+      'Error cargando datos'
     );
-
-
-  } finally {
-
-    state.loading = false;
 
   }
 
 }
 
 
-// =========================================================
-// PRODUCTOS INICIALES
-// =========================================================
+/* =========================================================
+   PRODUCTOS INICIALES
+   ========================================================= */
 
 async function seedProducts() {
+
+  console.log(
+    '🌱 Creando productos iniciales...'
+  );
+
 
   const {
     data,
@@ -945,35 +949,39 @@ async function seedProducts() {
     .select();
 
 
-  if (!error) {
-
-    state.products =
-      data || [];
-
-  } else {
+  if (error) {
 
     console.warn(
-      'Seed products:',
+      '⚠️ Seed products:',
       error.message
     );
 
+    return;
+
   }
+
+
+  state.products =
+    data || [];
 
 }
 
 
-// =========================================================
-// REALTIME
-// =========================================================
+/* =========================================================
+   REALTIME
+   ========================================================= */
 
 function subscribeRealtime() {
 
-  console.log(
-    'Configurando Supabase Realtime...'
-  );
-
+  /*
+    Eliminar canal anterior.
+  */
 
   if (state.realtime) {
+
+    console.log(
+      '♻️ Eliminando canal Realtime anterior'
+    );
 
     db.removeChannel(
       state.realtime
@@ -984,18 +992,38 @@ function subscribeRealtime() {
   }
 
 
+  if (!state.user) {
+
+    console.warn(
+      '⚠️ Realtime: no existe usuario'
+    );
+
+    return;
+
+  }
+
+
+  /*
+    Nombre único del canal.
+  */
+
   const channelName =
-    'hypefriends-sync-' +
-    state.user.id +
-    '-' +
-    Math.random()
-      .toString(36)
-      .slice(2);
+    `hypefriends-business-${state.user.id}-${Date.now()}`;
+
+
+  console.log(
+    '📡 Creando canal:',
+    channelName
+  );
 
 
   const channel =
     db.channel(channelName);
 
+
+  /*
+    TABLAS QUE ESCUCHAMOS.
+  */
 
   const tables = [
 
@@ -1016,6 +1044,11 @@ function subscribeRealtime() {
 
   tables.forEach(table => {
 
+    console.log(
+      `👂 Escuchando Realtime: ${table}`
+    );
+
+
     channel.on(
 
       'postgres_changes',
@@ -1030,26 +1063,44 @@ function subscribeRealtime() {
 
       },
 
-      payload => {
+      async payload => {
 
         console.log(
-          '🔄 REALTIME:',
-          table,
+          `🔄 REALTIME RECIBIDO → ${table}`,
           payload
         );
 
 
-        // No esperamos a que termine
-        // para evitar bloquear otros eventos.
+        /*
+          Cuando otro dispositivo modifica
+          Supabase, volvemos a consultar
+          TODOS los datos.
+        */
 
-        loadAll()
-          .then(() => {
+        try {
 
-            render(
-              state.view
-            );
+          await loadAll();
 
-          });
+
+          render(
+            state.view
+          );
+
+
+          setSync(
+            true,
+            `Actualizado: ${table}`
+          );
+
+
+        } catch (error) {
+
+          console.error(
+            '❌ Error procesando Realtime:',
+            error
+          );
+
+        }
 
       }
 
@@ -1058,13 +1109,18 @@ function subscribeRealtime() {
   });
 
 
+  /*
+    CONECTAR.
+  */
+
   state.realtime =
     channel.subscribe(
-      status => {
+      (status, error) => {
 
         console.log(
-          '📡 SUPABASE REALTIME:',
-          status
+          '📡 REALTIME STATUS:',
+          status,
+          error || ''
         );
 
 
@@ -1072,45 +1128,63 @@ function subscribeRealtime() {
           status === 'SUBSCRIBED'
         ) {
 
+          console.log(
+            '✅✅ REALTIME CONECTADO'
+          );
+
+
           setSync(
             true,
-            'Tiempo real conectado'
-          );
-
-
-          console.log(
-            '✅ REALTIME CONECTADO'
+            'Sincronizado en tiempo real'
           );
 
         }
 
 
         if (
-          status ===
-          'CHANNEL_ERROR'
+          status === 'CHANNEL_ERROR'
         ) {
-
-          setSync(
-            false,
-            'Realtime con error'
-          );
-
 
           console.error(
-            '❌ REALTIME ERROR'
+            '❌ REALTIME CHANNEL ERROR:',
+            error
+          );
+
+
+          setSync(
+            false,
+            'Error de sincronización'
           );
 
         }
 
 
         if (
-          status ===
-          'TIMED_OUT'
+          status === 'TIMED_OUT'
         ) {
+
+          console.warn(
+            '⏱️ REALTIME TIMEOUT'
+          );
+
 
           setSync(
             false,
-            'Realtime agotado'
+            'Reintentando...'
+          );
+
+
+          setTimeout(
+            () => {
+
+              if (state.user) {
+
+                subscribeRealtime();
+
+              }
+
+            },
+            3000
           );
 
         }
@@ -1120,9 +1194,14 @@ function subscribeRealtime() {
           status === 'CLOSED'
         ) {
 
+          console.warn(
+            '🔌 REALTIME CERRADO'
+          );
+
+
           setSync(
             false,
-            'Realtime cerrado'
+            'Sincronización desconectada'
           );
 
         }
@@ -1133,103 +1212,31 @@ function subscribeRealtime() {
 }
 
 
-// =========================================================
-// SINCRONIZACIÓN AUTOMÁTICA
-// =========================================================
-
-function startAutoSync() {
-
-  stopAutoSync();
-
-
-  console.log(
-    '🔁 Auto Sync iniciado'
-  );
-
-
-  state.syncTimer =
-    setInterval(
-      async () => {
-
-        if (
-          !state.user
-        ) {
-
-          return;
-
-        }
-
-
-        console.log(
-          '🔄 Auto Sync...'
-        );
-
-
-        await loadAll();
-
-
-        render(
-          state.view
-        );
-
-      },
-
-      3000
-
-    );
-
-}
-
-
-function stopAutoSync() {
-
-  if (
-    state.syncTimer
-  ) {
-
-    clearInterval(
-      state.syncTimer
-    );
-
-    state.syncTimer = null;
-
-  }
-
-}
-
-
-// =========================================================
-// TOTALES
-// =========================================================
+/* =========================================================
+   TOTALES
+   ========================================================= */
 
 function totals(currency) {
 
   const sales =
     state.sales.filter(
-      s =>
-        s.currency ===
-        currency
+      sale =>
+        sale.currency === currency
     );
 
 
   const total =
     sales.reduce(
-      (a, s) =>
-        a +
-        Number(
-          s.total || 0
-        ),
+      (sum, sale) =>
+        sum + Number(sale.total || 0),
       0
     );
 
 
   const paid =
     sales.reduce(
-      (a, s) =>
-        a +
-        Number(
-          s.paid || 0
-        ),
+      (sum, sale) =>
+        sum + Number(sale.paid || 0),
       0
     );
 
@@ -1237,15 +1244,13 @@ function totals(currency) {
   const expenses =
     state.expenses
       .filter(
-        e =>
-          e.currency ===
-          currency
+        expense =>
+          expense.currency === currency
       )
       .reduce(
-        (a, e) =>
-          a +
-          Number(
-            e.amount || 0
+        (sum, expense) =>
+          sum + Number(
+            expense.amount || 0
           ),
         0
       );
@@ -1270,13 +1275,11 @@ function totals(currency) {
 }
 
 
-// =========================================================
-// RENDER
-// =========================================================
+/* =========================================================
+   RENDER
+   ========================================================= */
 
-function render(
-  view = 'dashboard'
-) {
+function render(view = 'dashboard') {
 
   state.view = view;
 
@@ -1287,36 +1290,33 @@ function render(
 
       button.classList.toggle(
         'active',
-        button.dataset.view ===
-        view
+        button.dataset.view === view
       );
 
     });
 
 
+  const titles = {
+
+    dashboard: 'DASHBOARD',
+
+    sales: 'VENTAS',
+
+    inventory: 'INVENTARIO',
+
+    finance: 'FINANZAS',
+
+    customers: 'CLIENTES',
+
+    history: 'HISTORIAL'
+
+  };
+
+
   if ($('#viewTitle')) {
 
-    $('#viewTitle').textContent = {
-
-      dashboard:
-        'DASHBOARD',
-
-      sales:
-        'VENTAS',
-
-      inventory:
-        'INVENTARIO',
-
-      finance:
-        'FINANZAS',
-
-      customers:
-        'CLIENTES',
-
-      history:
-        'HISTORIAL'
-
-    }[view] ||
+    $('#viewTitle').textContent =
+      titles[view] ||
       'DASHBOARD';
 
   }
@@ -1329,54 +1329,42 @@ function render(
   if (!content) return;
 
 
-  if (
-    view === 'dashboard'
-  ) {
+  if (view === 'dashboard') {
 
     dashboard(content);
 
   }
 
 
-  if (
-    view === 'sales'
-  ) {
+  if (view === 'sales') {
 
     sales(content);
 
   }
 
 
-  if (
-    view === 'inventory'
-  ) {
+  if (view === 'inventory') {
 
     inventory(content);
 
   }
 
 
-  if (
-    view === 'finance'
-  ) {
+  if (view === 'finance') {
 
     finance(content);
 
   }
 
 
-  if (
-    view === 'customers'
-  ) {
+  if (view === 'customers') {
 
     customers(content);
 
   }
 
 
-  if (
-    view === 'history'
-  ) {
+  if (view === 'history') {
 
     history(content);
 
@@ -1385,9 +1373,9 @@ function render(
 }
 
 
-// =========================================================
-// DASHBOARD
-// =========================================================
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
 
 function dashboard(c) {
 
@@ -1400,10 +1388,9 @@ function dashboard(c) {
 
   const stock =
     state.products.reduce(
-      (a, p) =>
-        a +
-        Number(
-          p.stock || 0
+      (sum, product) =>
+        sum + Number(
+          product.stock || 0
         ),
       0
     );
@@ -1414,13 +1401,15 @@ function dashboard(c) {
     <div class="grid stats">
 
       <div class="card">
+
         <div class="label">
           Ventas CRC
         </div>
 
         <div class="metric">
-          ${money(crc.total,'CRC')}
+          ${money(crc.total, 'CRC')}
         </div>
+
       </div>
 
 
@@ -1431,7 +1420,7 @@ function dashboard(c) {
         </div>
 
         <div class="metric orange">
-          ${money(crc.paid,'CRC')}
+          ${money(crc.paid, 'CRC')}
         </div>
 
       </div>
@@ -1444,7 +1433,7 @@ function dashboard(c) {
         </div>
 
         <div class="metric">
-          ${money(usd.total,'USD')}
+          ${money(usd.total, 'USD')}
         </div>
 
       </div>
@@ -1509,7 +1498,7 @@ function dashboard(c) {
             </div>
 
             <div class="metric orange">
-              ${money(crc.due,'CRC')}
+              ${money(crc.due, 'CRC')}
             </div>
 
           </div>
@@ -1522,7 +1511,7 @@ function dashboard(c) {
             </div>
 
             <div class="metric orange">
-              ${money(usd.due,'USD')}
+              ${money(usd.due, 'USD')}
             </div>
 
           </div>
@@ -1535,9 +1524,9 @@ function dashboard(c) {
             </div>
 
             <div class="metric">
-              ${money(crc.expenses,'CRC')}
+              ${money(crc.expenses, 'CRC')}
               ·
-              ${money(usd.expenses,'USD')}
+              ${money(usd.expenses, 'USD')}
             </div>
 
           </div>
@@ -1552,8 +1541,7 @@ function dashboard(c) {
             <div class="metric">
               ${
                 state.products.filter(
-                  p =>
-                    Number(p.stock) <= 3
+                  p => Number(p.stock) <= 3
                 ).length
               }
             </div>
@@ -1571,9 +1559,9 @@ function dashboard(c) {
 }
 
 
-// =========================================================
-// TABLA VENTAS
-// =========================================================
+/* =========================================================
+   TABLA DE VENTAS
+   ========================================================= */
 
 function saleTable(n = 99) {
 
@@ -1619,115 +1607,105 @@ function saleTable(n = 99) {
         <tbody>
 
           ${
-            rows.map(
-              s => `
+            rows.map(sale => `
 
-                <tr>
+              <tr>
 
-                  <td>
+                <td>
 
-                    <b>
-                      ${escapeHtml(
-                        s.customer
-                      )}
-                    </b>
+                  <b>
+                    ${escapeHtml(sale.customer)}
+                  </b>
 
-                    <br>
+                  <br>
 
-                    <span class="muted">
-                      ${escapeHtml(
-                        s.id
-                      )}
-                    </span>
+                  <span class="muted">
+                    ${escapeHtml(sale.id)}
+                  </span>
 
-                  </td>
+                </td>
 
 
-                  <td>
-                    ${money(
-                      s.total,
-                      s.currency
-                    )}
-                  </td>
+                <td>
+                  ${money(
+                    sale.total,
+                    sale.currency
+                  )}
+                </td>
 
 
-                  <td>
-                    ${money(
-                      s.paid,
-                      s.currency
-                    )}
-                  </td>
+                <td>
+                  ${money(
+                    sale.paid,
+                    sale.currency
+                  )}
+                </td>
 
 
-                  <td>
+                <td>
 
-                    <span
-                      class="badge ${
-                        s.paid >= s.total
-                          ? 'green'
-                          : 'orange'
-                      }"
-                    >
-
-                      ${
-                        s.paid >= s.total
-                          ? 'Pagada'
-                          : 'Pendiente'
-                      }
-
-                    </span>
-
-                  </td>
-
-
-                  <td>
+                  <span
+                    class="badge ${
+                      Number(sale.paid) >=
+                      Number(sale.total)
+                        ? 'green'
+                        : 'orange'
+                    }"
+                  >
 
                     ${
-                      s.paid < s.total
-
-                        ? `
-
-                          <button
-                            class="primary small"
-                            onclick="openPayment('${s.id}')"
-                          >
-                            ABONO
-                          </button>
-
-                        `
-
-                        : ''
-
+                      Number(sale.paid) >=
+                      Number(sale.total)
+                        ? 'Pagada'
+                        : 'Pendiente'
                     }
 
-                  </td>
+                  </span>
 
-                </tr>
-
-              `
-            ).join('')
-          }
+                </td>
 
 
-          ${
-            !rows.length
+                <td>
 
-              ? `
+                  ${
+                    Number(sale.paid) <
+                    Number(sale.total)
 
-                <tr>
+                    ?
 
-                  <td
-                    colspan="5"
-                    class="muted"
-                  >
-                    No hay ventas todavía.
-                  </td>
+                    `<button
+                      class="primary small"
+                      onclick="openPayment('${sale.id}')"
+                    >
+                      ABONO
+                    </button>`
 
-                </tr>
+                    :
 
-              `
+                    ''
 
-              : ''
+                  }
+
+                </td>
+
+              </tr>
+
+            `).join('')
+
+            ||
+
+            `
+              <tr>
+
+                <td
+                  colspan="5"
+                  class="muted"
+                >
+                  No hay ventas todavía.
+                </td>
+
+              </tr>
+            `
 
           }
 
@@ -1742,9 +1720,9 @@ function saleTable(n = 99) {
 }
 
 
-// =========================================================
-// VENTAS
-// =========================================================
+/* =========================================================
+   VENTAS
+   ========================================================= */
 
 function sales(c) {
 
@@ -1772,9 +1750,9 @@ function sales(c) {
 }
 
 
-// =========================================================
-// INVENTARIO
-// =========================================================
+/* =========================================================
+   INVENTARIO
+   ========================================================= */
 
 function inventory(c) {
 
@@ -1799,28 +1777,26 @@ function inventory(c) {
     <div class="product-list">
 
       ${
-        state.products.map(
-          p => `
+        state.products
+          .map(product => `
 
             <div class="card product">
 
               <div class="label">
                 ${escapeHtml(
-                  p.category
+                  product.category
                 )}
               </div>
 
               <h3>
                 ${escapeHtml(
-                  p.name
+                  product.name
                 )}
               </h3>
 
               <div class="stock">
 
-                ${Number(
-                  p.stock
-                )}
+                ${Number(product.stock)}
 
                 <span class="muted">
                   unidades
@@ -1832,16 +1808,16 @@ function inventory(c) {
 
                 Venta:
                 ${money(
-                  p.price,
-                  p.currency
+                  product.price,
+                  product.currency
                 )}
 
                 ·
 
                 Costo:
                 ${money(
-                  p.cost,
-                  p.currency
+                  product.cost,
+                  product.currency
                 )}
 
               </div>
@@ -1851,7 +1827,7 @@ function inventory(c) {
                 <span
                   style="
                     width:${Math.min(
-                      Number(p.stock) * 10,
+                      Number(product.stock) * 10,
                       100
                     )}%
                   "
@@ -1861,23 +1837,16 @@ function inventory(c) {
 
             </div>
 
-          `
-        ).join('')
-      }
+          `)
+          .join('')
 
+        ||
 
-      ${
-        !state.products.length
-
-          ? `
-
-            <div class="card muted">
-              No hay productos.
-            </div>
-
-          `
-
-          : ''
+        `
+          <div class="card muted">
+            No hay productos.
+          </div>
+        `
 
       }
 
@@ -1888,9 +1857,9 @@ function inventory(c) {
 }
 
 
-// =========================================================
-// FINANZAS
-// =========================================================
+/* =========================================================
+   FINANZAS
+   ========================================================= */
 
 function finance(c) {
 
@@ -1912,10 +1881,7 @@ function finance(c) {
         </div>
 
         <div class="metric">
-          ${money(
-            crc.total,
-            'CRC'
-          )}
+          ${money(crc.total, 'CRC')}
         </div>
 
       </div>
@@ -1928,10 +1894,7 @@ function finance(c) {
         </div>
 
         <div class="metric">
-          ${money(
-            usd.total,
-            'USD'
-          )}
+          ${money(usd.total, 'USD')}
         </div>
 
       </div>
@@ -1945,17 +1908,11 @@ function finance(c) {
 
         <div class="metric">
 
-          ${money(
-            crc.expenses,
-            'CRC'
-          )}
+          ${money(crc.expenses, 'CRC')}
 
           ·
 
-          ${money(
-            usd.expenses,
-            'USD'
-          )}
+          ${money(usd.expenses, 'USD')}
 
         </div>
 
@@ -2011,57 +1968,48 @@ function finance(c) {
             state.expenses
               .slice()
               .reverse()
-              .map(
-                x => `
-
-                  <tr>
-
-                    <td>
-                      ${escapeHtml(
-                        x.note
-                      )}
-                    </td>
-
-                    <td>
-                      ${money(
-                        x.amount,
-                        x.currency
-                      )}
-                    </td>
-
-                    <td>
-                      ${String(
-                        x.created_at || ''
-                      ).slice(0,10)}
-                    </td>
-
-                  </tr>
-
-                `
-              )
-              .join('')
-          }
-
-
-          ${
-            !state.expenses.length
-
-              ? `
+              .map(expense => `
 
                 <tr>
 
-                  <td
-                    colspan="3"
-                    class="muted"
-                  >
-                    No hay gastos.
+                  <td>
+                    ${escapeHtml(
+                      expense.note
+                    )}
+                  </td>
+
+                  <td>
+                    ${money(
+                      expense.amount,
+                      expense.currency
+                    )}
+                  </td>
+
+                  <td>
+                    ${String(
+                      expense.created_at || ''
+                    ).slice(0, 10)}
                   </td>
 
                 </tr>
 
-              `
+              `)
+              .join('')
 
-              : ''
+            ||
+
+            `
+              <tr>
+
+                <td
+                  colspan="3"
+                  class="muted"
+                >
+                  No hay gastos.
+                </td>
+
+              </tr>
+            `
 
           }
 
@@ -2076,9 +2024,9 @@ function finance(c) {
 }
 
 
-// =========================================================
-// CLIENTES
-// =========================================================
+/* =========================================================
+   CLIENTES
+   ========================================================= */
 
 function customers(c) {
 
@@ -2103,60 +2051,53 @@ function customers(c) {
     <div class="product-list">
 
       ${
-        state.customers.map(
-          x => `
+        state.customers
+          .map(customer => `
 
             <div class="card">
 
               <h3>
                 ${escapeHtml(
-                  x.name
+                  customer.name
                 )}
               </h3>
 
               <div class="muted">
                 ${escapeHtml(
-                  x.phone ||
+                  customer.phone ||
                   'Sin teléfono'
                 )}
               </div>
 
               ${
-                x.email
+                customer.email
 
-                  ? `
+                ?
 
-                    <div class="muted">
-                      ${escapeHtml(
-                        x.email
-                      )}
-                    </div>
+                `<div class="muted">
+                  ${escapeHtml(
+                    customer.email
+                  )}
+                </div>`
 
-                  `
+                :
 
-                  : ''
+                ''
 
               }
 
             </div>
 
-          `
-        ).join('')
-      }
+          `)
+          .join('')
 
+        ||
 
-      ${
-        !state.customers.length
-
-          ? `
-
-            <div class="card muted">
-              Agrega tu primer cliente.
-            </div>
-
-          `
-
-          : ''
+        `
+          <div class="card muted">
+            Agrega tu primer cliente.
+          </div>
+        `
 
       }
 
@@ -2167,83 +2108,73 @@ function customers(c) {
 }
 
 
-// =========================================================
-// HISTORIAL
-// =========================================================
+/* =========================================================
+   HISTORIAL
+   ========================================================= */
 
 function history(c) {
 
   const rows = [];
 
 
-  state.sales.forEach(
-    sale => {
+  state.sales.forEach(sale => {
 
-      sale.payments.forEach(
-        payment => {
-
-          rows.push({
-
-            type: 'Pago',
-
-            desc:
-              `${sale.customer} · ${sale.id}`,
-
-            amount:
-              payment.amount,
-
-            currency:
-              payment.currency ||
-              sale.currency,
-
-            date:
-              String(
-                payment.created_at ||
-                ''
-              ).slice(0,10)
-
-          });
-
-        }
-      );
-
-    }
-  );
-
-
-  state.expenses.forEach(
-    expense => {
+    sale.payments.forEach(payment => {
 
       rows.push({
 
-        type: 'Gasto',
+        type: 'Pago',
 
         desc:
-          expense.note,
+          `${sale.customer} · ${sale.id}`,
 
         amount:
-          expense.amount,
+          payment.amount,
 
         currency:
-          expense.currency,
+          payment.currency ||
+          sale.currency,
 
         date:
           String(
-            expense.created_at ||
-            ''
-          ).slice(0,10)
+            payment.created_at || ''
+          ).slice(0, 10)
 
       });
 
-    }
-  );
+    });
+
+  });
+
+
+  state.expenses.forEach(expense => {
+
+    rows.push({
+
+      type: 'Gasto',
+
+      desc:
+        expense.note,
+
+      amount:
+        expense.amount,
+
+      currency:
+        expense.currency,
+
+      date:
+        String(
+          expense.created_at || ''
+        ).slice(0, 10)
+
+    });
+
+  });
 
 
   rows.sort(
-    (a,b) =>
-      b.date.localeCompare(
-        a.date
-      )
+    (a, b) =>
+      b.date.localeCompare(a.date)
   );
 
 
@@ -2290,62 +2221,53 @@ function history(c) {
         <tbody>
 
           ${
-            rows.map(
-              r => `
+            rows.map(row => `
 
-                <tr>
+              <tr>
 
-                  <td>
+                <td>
 
-                    <span class="badge">
-                      ${r.type}
-                    </span>
+                  <span class="badge">
+                    ${row.type}
+                  </span>
 
-                  </td>
+                </td>
 
-                  <td>
-                    ${escapeHtml(
-                      r.desc
-                    )}
-                  </td>
+                <td>
+                  ${escapeHtml(
+                    row.desc
+                  )}
+                </td>
 
-                  <td>
-                    ${money(
-                      r.amount,
-                      r.currency
-                    )}
-                  </td>
+                <td>
+                  ${money(
+                    row.amount,
+                    row.currency
+                  )}
+                </td>
 
-                  <td>
-                    ${r.date}
-                  </td>
+                <td>
+                  ${row.date}
+                </td>
 
-                </tr>
+              </tr>
 
-              `
-            ).join('')
-          }
+            `).join('')
 
+            ||
 
-          ${
-            !rows.length
+            `
+              <tr>
 
-              ? `
+                <td
+                  colspan="4"
+                  class="muted"
+                >
+                  No hay movimientos.
+                </td>
 
-                <tr>
-
-                  <td
-                    colspan="4"
-                    class="muted"
-                  >
-                    No hay movimientos.
-                  </td>
-
-                </tr>
-
-              `
-
-              : ''
+              </tr>
+            `
 
           }
 
@@ -2360,32 +2282,16 @@ function history(c) {
 }
 
 
-// =========================================================
-// MODAL
-// =========================================================
+/* =========================================================
+   MODAL
+   ========================================================= */
 
 function modal(html) {
 
-  const content =
-    $('#modalContent');
-
-  const modalElement =
-    $('#modal');
-
-
-  if (!content ||
-      !modalElement) {
-
-    return;
-
-  }
-
-
-  content.innerHTML =
+  $('#modalContent').innerHTML =
     html;
 
-
-  modalElement.classList.remove(
+  $('#modal').classList.remove(
     'hidden'
   );
 
@@ -2394,22 +2300,20 @@ function modal(html) {
 
 function closeModal() {
 
-  $('#modal')?.classList.add(
+  $('#modal').classList.add(
     'hidden'
   );
 
 }
 
 
-// =========================================================
-// NUEVA VENTA
-// =========================================================
+/* =========================================================
+   NUEVA VENTA
+   ========================================================= */
 
 function openSale() {
 
-  if (
-    !state.products.length
-  ) {
+  if (!state.products.length) {
 
     return toast(
       'Primero agrega un producto'
@@ -2438,19 +2342,19 @@ function openSale() {
           </option>
 
           ${
-            state.customers.map(
-              c => `
+            state.customers
+              .map(customer => `
 
                 <option
-                  value="${c.id}"
+                  value="${customer.id}"
                 >
                   ${escapeHtml(
-                    c.name
+                    customer.name
                   )}
                 </option>
 
-              `
-            ).join('')
+              `)
+              .join('')
           }
 
         </select>
@@ -2465,26 +2369,33 @@ function openSale() {
         <select id="fProduct">
 
           ${
-            state.products.map(
-              p => `
+            state.products
+              .map(product => `
 
                 <option
-                  value="${p.id}"
+                  value="${product.id}"
                 >
+
                   ${escapeHtml(
-                    p.name
+                    product.name
                   )}
+
                   —
+
                   ${money(
-                    p.price,
-                    p.currency
+                    product.price,
+                    product.currency
                   )}
+
                   —
-                  stock ${p.stock}
+
+                  stock
+                  ${product.stock}
+
                 </option>
 
-              `
-            ).join('')
+              `)
+              .join('')
           }
 
         </select>
@@ -2532,7 +2443,9 @@ function openSale() {
           ₡0
         </strong>
 
-        <small id="saleCurrencyHint"></small>
+        <small
+          id="saleCurrencyHint"
+        ></small>
 
       </div>
 
@@ -2549,20 +2462,20 @@ function openSale() {
   `);
 
 
-  [
-    'fProduct',
-    'fQty'
-  ].forEach(
-    id => {
+  ['fProduct', 'fQty']
+    .forEach(id => {
 
-      $('#' + id)
-        ?.addEventListener(
-          'input',
-          updateSaleTotal
-        );
+      $('#' + id)?.addEventListener(
+        'input',
+        updateSaleTotal
+      );
 
-    }
-  );
+      $('#' + id)?.addEventListener(
+        'change',
+        updateSaleTotal
+      );
+
+    });
 
 
   updateSaleTotal();
@@ -2570,16 +2483,16 @@ function openSale() {
 }
 
 
-// =========================================================
-// TOTAL VENTA
-// =========================================================
+/* =========================================================
+   ACTUALIZAR TOTAL
+   ========================================================= */
 
 function updateSaleTotal() {
 
   const product =
     state.products.find(
-      x =>
-        x.id ===
+      p =>
+        p.id ===
         $('#fProduct')?.value
     );
 
@@ -2589,48 +2502,38 @@ function updateSaleTotal() {
 
   const quantity =
     Number(
-      $('#fQty')?.value ||
-      1
+      $('#fQty')?.value || 1
     );
 
 
-  if ($('#saleTotal')) {
-
-    $('#saleTotal').textContent =
-      money(
-        Number(product.price) *
+  $('#saleTotal').textContent =
+    money(
+      Number(product.price) *
         quantity,
-        product.currency
-      );
-
-  }
+      product.currency
+    );
 
 
-  if ($('#saleCurrencyHint')) {
-
-    $('#saleCurrencyHint')
-      .textContent =
-      `Moneda de la venta: ${
-        product.currency === 'USD'
-          ? 'Dólares'
-          : 'Colones'
-      }`;
-
-  }
+  $('#saleCurrencyHint').textContent =
+    `Moneda de la venta: ${
+      product.currency === 'USD'
+        ? 'Dólares'
+        : 'Colones'
+    }`;
 
 }
 
 
-// =========================================================
-// CREAR VENTA
-// =========================================================
+/* =========================================================
+   CREAR VENTA
+   ========================================================= */
 
 async function createSale() {
 
   const product =
     state.products.find(
-      x =>
-        x.id ===
+      p =>
+        p.id ===
         $('#fProduct').value
     );
 
@@ -2643,8 +2546,7 @@ async function createSale() {
 
   const paid =
     Number(
-      $('#fPaid').value ||
-      0
+      $('#fPaid').value || 0
     );
 
 
@@ -2653,10 +2555,7 @@ async function createSale() {
     null;
 
 
-  if (
-    !product ||
-    quantity <= 0
-  ) {
+  if (!product || quantity <= 0) {
 
     return toast(
       'Datos de venta inválidos'
@@ -2684,10 +2583,7 @@ async function createSale() {
 
   const realPaid =
     Math.min(
-      Math.max(
-        paid,
-        0
-      ),
+      Math.max(paid, 0),
       total
     );
 
@@ -2707,36 +2603,40 @@ async function createSale() {
   const {
     data: sale,
     error: saleError
-  } =
-    await db
-      .from('sales')
-      .insert({
+  } = await db
+    .from('sales')
+    .insert({
 
-        customer_id:
-          customerId,
+      customer_id:
+        customerId,
 
-        total,
+      total,
 
-        paid:
-          realPaid,
+      paid:
+        realPaid,
 
-        currency:
-          product.currency,
+      currency:
+        product.currency,
 
-        status,
+      status,
 
-        created_by:
-          state.user.id
+      created_by:
+        state.user.id
 
-      })
-      .select()
-      .single();
+    })
+    .select()
+    .single();
 
 
   if (saleError) {
 
     console.error(
       saleError
+    );
+
+    setSync(
+      false,
+      'Error guardando'
     );
 
     return toast(
@@ -2748,32 +2648,35 @@ async function createSale() {
 
   const {
     error: itemError
-  } =
-    await db
-      .from('sale_items')
-      .insert({
+  } = await db
+    .from('sale_items')
+    .insert({
 
-        sale_id:
-          sale.id,
+      sale_id:
+        sale.id,
 
-        product_id:
-          product.id,
+      product_id:
+        product.id,
 
-        quantity,
+      quantity,
 
-        unit_price:
-          product.price,
+      unit_price:
+        product.price,
 
-        unit_cost:
-          product.cost
+      unit_cost:
+        product.cost
 
-      });
+    });
 
 
   if (itemError) {
 
     console.error(
       itemError
+    );
+
+    toast(
+      'Venta creada, pero falló el detalle'
     );
 
   }
@@ -2783,24 +2686,23 @@ async function createSale() {
 
     const {
       error: paymentError
-    } =
-      await db
-        .from('payments')
-        .insert({
+    } = await db
+      .from('payments')
+      .insert({
 
-          sale_id:
-            sale.id,
+        sale_id:
+          sale.id,
 
-          amount:
-            realPaid,
+        amount:
+          realPaid,
 
-          currency:
-            product.currency,
+        currency:
+          product.currency,
 
-          created_by:
-            state.user.id
+        created_by:
+          state.user.id
 
-        });
+      });
 
 
     if (paymentError) {
@@ -2816,24 +2718,22 @@ async function createSale() {
 
   const {
     error: stockError
-  } =
-    await db
-      .from('products')
-      .update({
+  } = await db
+    .from('products')
+    .update({
 
-        stock:
-          Number(
-            product.stock
-          ) - quantity,
+      stock:
+        Number(product.stock) -
+        quantity,
 
-        updated_at:
-          new Date().toISOString()
+      updated_at:
+        new Date().toISOString()
 
-      })
-      .eq(
-        'id',
-        product.id
-      );
+    })
+    .eq(
+      'id',
+      product.id
+    );
 
 
   if (stockError) {
@@ -2842,14 +2742,21 @@ async function createSale() {
       stockError
     );
 
+    toast(
+      'Venta creada, pero no se pudo actualizar stock'
+    );
+
   }
 
 
   await loadAll();
 
+
   closeModal();
 
+
   render('sales');
+
 
   toast(
     'VENTA REGISTRADA EN LA NUBE'
@@ -2858,24 +2765,19 @@ async function createSale() {
 }
 
 
-// =========================================================
-// ABONO
-// =========================================================
+/* =========================================================
+   ABONO
+   ========================================================= */
 
 function openPayment(id) {
 
   const sale =
     state.sales.find(
-      x => x.id === id
+      s => s.id === id
     );
 
 
   if (!sale) return;
-
-
-  const due =
-    Number(sale.total) -
-    Number(sale.paid);
 
 
   modal(`
@@ -2911,7 +2813,8 @@ function openPayment(id) {
       <div class="metric orange">
 
         ${money(
-          due,
+          Number(sale.total) -
+          Number(sale.paid),
           sale.currency
         )}
 
@@ -2930,7 +2833,10 @@ function openPayment(id) {
           id="payAmount"
           type="number"
           min="0.01"
-          max="${due}"
+          max="${
+            Number(sale.total) -
+            Number(sale.paid)
+          }"
           step="0.01"
         >
 
@@ -2941,7 +2847,7 @@ function openPayment(id) {
         class="primary"
         onclick="addPayment('${sale.id}')"
       >
-        REGISTRAR ABONO
+        REGISTRAR ABONO Y COMPROBANTE
       </button>
 
     </div>
@@ -2951,15 +2857,15 @@ function openPayment(id) {
 }
 
 
-// =========================================================
-// AGREGAR ABONO
-// =========================================================
+/* =========================================================
+   AGREGAR ABONO
+   ========================================================= */
 
 async function addPayment(id) {
 
   const sale =
     state.sales.find(
-      x => x.id === id
+      s => s.id === id
     );
 
 
@@ -2992,23 +2898,22 @@ async function addPayment(id) {
 
   const {
     error: paymentError
-  } =
-    await db
-      .from('payments')
-      .insert({
+  } = await db
+    .from('payments')
+    .insert({
 
-        sale_id:
-          id,
+      sale_id:
+        id,
 
-        amount,
+      amount,
 
-        currency:
-          sale.currency,
+      currency:
+        sale.currency,
 
-        created_by:
-          state.user.id
+      created_by:
+        state.user.id
 
-      });
+    });
 
 
   if (paymentError) {
@@ -3031,25 +2936,24 @@ async function addPayment(id) {
 
   const {
     error: saleError
-  } =
-    await db
-      .from('sales')
-      .update({
+  } = await db
+    .from('sales')
+    .update({
 
-        paid:
-          newPaid,
+      paid:
+        newPaid,
 
-        status:
-          newPaid >=
-          Number(sale.total)
-            ? 'paid'
-            : 'pending'
+      status:
+        newPaid >=
+        Number(sale.total)
+          ? 'paid'
+          : 'pending'
 
-      })
-      .eq(
-        'id',
-        id
-      );
+    })
+    .eq(
+      'id',
+      id
+    );
 
 
   if (saleError) {
@@ -3059,7 +2963,7 @@ async function addPayment(id) {
     );
 
     return toast(
-      'Abono creado, pero venta no actualizada'
+      'Abono creado, pero no se actualizó la venta'
     );
 
   }
@@ -3070,7 +2974,7 @@ async function addPayment(id) {
 
   const updated =
     state.sales.find(
-      x => x.id === id
+      s => s.id === id
     );
 
 
@@ -3085,9 +2989,9 @@ async function addPayment(id) {
 }
 
 
-// =========================================================
-// COMPROBANTE
-// =========================================================
+/* =========================================================
+   COMPROBANTE
+   ========================================================= */
 
 function receiptText(
   sale,
@@ -3099,10 +3003,10 @@ COMPROBANTE DE PAGO
 
 Cliente: ${sale.customer}
 Venta: ${sale.id}
-Pago recibido: ${money(amount,sale.currency)}
-Total compra: ${money(sale.total,sale.currency)}
-Total abonado: ${money(sale.paid,sale.currency)}
-Saldo pendiente: ${money(Number(sale.total)-Number(sale.paid),sale.currency)}
+Pago recibido: ${money(amount, sale.currency)}
+Total compra: ${money(sale.total, sale.currency)}
+Total abonado: ${money(sale.paid, sale.currency)}
+Saldo pendiente: ${money(Number(sale.total) - Number(sale.paid), sale.currency)}
 
 SIN INTERESES
 Gracias por comprar en HYPEFRIENDS.`;
@@ -3133,44 +3037,85 @@ function showReceipt(
       <hr>
 
       <div class="receipt-row">
-        <span>Cliente</span>
-        <b>${escapeHtml(
-          sale.customer
-        )}</b>
+
+        <span>
+          Cliente
+        </span>
+
+        <b>
+          ${escapeHtml(
+            sale.customer
+          )}
+        </b>
+
       </div>
 
-      <div class="receipt-row">
-        <span>Venta</span>
-        <b>${escapeHtml(
-          sale.id
-        )}</b>
-      </div>
 
       <div class="receipt-row">
-        <span>Pago recibido</span>
-        <b>${money(
-          amount,
-          sale.currency
-        )}</b>
+
+        <span>
+          Venta
+        </span>
+
+        <b>
+          ${escapeHtml(
+            sale.id
+          )}
+        </b>
+
       </div>
 
-      <div class="receipt-row">
-        <span>Total compra</span>
-        <b>${money(
-          sale.total,
-          sale.currency
-        )}</b>
-      </div>
 
       <div class="receipt-row">
-        <span>Total abonado</span>
-        <b>${money(
-          sale.paid,
-          sale.currency
-        )}</b>
+
+        <span>
+          Pago recibido
+        </span>
+
+        <b>
+          ${money(
+            amount,
+            sale.currency
+          )}
+        </b>
+
       </div>
+
+
+      <div class="receipt-row">
+
+        <span>
+          Total compra
+        </span>
+
+        <b>
+          ${money(
+            sale.total,
+            sale.currency
+          )}
+        </b>
+
+      </div>
+
+
+      <div class="receipt-row">
+
+        <span>
+          Total abonado
+        </span>
+
+        <b>
+          ${money(
+            sale.paid,
+            sale.currency
+          )}
+        </b>
+
+      </div>
+
 
       <hr>
+
 
       <div class="receipt-row">
 
@@ -3179,20 +3124,25 @@ function showReceipt(
         </span>
 
         <b class="receipt-total">
+
           ${money(
             Number(sale.total) -
             Number(sale.paid),
             sale.currency
           )}
+
         </b>
 
       </div>
 
+
       <hr>
+
 
       <b>
         SIN INTERESES
       </b>
+
 
       <p class="muted">
         Gracias por comprar en HYPEFRIENDS.
@@ -3207,11 +3157,20 @@ function showReceipt(
     >
 
       <button
+        class="primary"
+        onclick="shareReceiptImage('${sale.id}',${Number(amount)})"
+      >
+        📲 COMPARTIR IMAGEN
+      </button>
+
+
+      <button
         class="outline light-button"
         onclick="shareReceiptText('${sale.id}',${Number(amount)})"
       >
         WHATSAPP / TEXTO
       </button>
+
 
       <button
         class="outline light-button"
@@ -3227,9 +3186,444 @@ function showReceipt(
 }
 
 
-// =========================================================
-// PRODUCTO
-// =========================================================
+/* =========================================================
+   CANVAS COMPROBANTE
+   ========================================================= */
+
+function buildReceiptCanvas(
+  sale,
+  amount
+) {
+
+  const canvas =
+    document.createElement(
+      'canvas'
+    );
+
+
+  canvas.width = 900;
+
+  canvas.height = 1120;
+
+
+  const ctx =
+    canvas.getContext(
+      '2d'
+    );
+
+
+  ctx.fillStyle =
+    '#ffffff';
+
+  ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  ctx.fillStyle =
+    '#090909';
+
+  ctx.textAlign =
+    'left';
+
+
+  ctx.font =
+    '900 48px Arial';
+
+  ctx.fillText(
+    'HYPEFRIENDS',
+    60,
+    90
+  );
+
+
+  ctx.font =
+    '700 22px Arial';
+
+  ctx.fillText(
+    'BUSINESS · COMPROBANTE DE PAGO',
+    60,
+    135
+  );
+
+
+  ctx.strokeStyle =
+    '#cccccc';
+
+  ctx.setLineDash(
+    [8, 8]
+  );
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    60,
+    175
+  );
+
+  ctx.lineTo(
+    840,
+    175
+  );
+
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+
+  const rows = [
+
+    [
+      'Cliente',
+      sale.customer
+    ],
+
+    [
+      'Venta',
+      sale.id
+    ],
+
+    [
+      'Pago recibido',
+      money(
+        amount,
+        sale.currency
+      )
+    ],
+
+    [
+      'Total compra',
+      money(
+        sale.total,
+        sale.currency
+      )
+    ],
+
+    [
+      'Total abonado',
+      money(
+        sale.paid,
+        sale.currency
+      )
+    ],
+
+    [
+      'Saldo pendiente',
+      money(
+        Number(sale.total) -
+        Number(sale.paid),
+        sale.currency
+      )
+    ]
+
+  ];
+
+
+  let y = 240;
+
+
+  ctx.font =
+    '500 25px Arial';
+
+
+  rows.forEach(
+    ([label, value], index) => {
+
+      ctx.fillStyle =
+        '#777';
+
+      ctx.fillText(
+        label,
+        60,
+        y
+      );
+
+
+      ctx.fillStyle =
+        '#090909';
+
+
+      ctx.font =
+        index === 5
+          ? '900 38px Arial'
+          : '700 26px Arial';
+
+
+      ctx.textAlign =
+        'right';
+
+
+      ctx.fillText(
+        String(value),
+        840,
+        y
+      );
+
+
+      ctx.textAlign =
+        'left';
+
+
+      y += 95;
+
+
+      ctx.font =
+        '500 25px Arial';
+
+    }
+  );
+
+
+  ctx.strokeStyle =
+    '#cccccc';
+
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    60,
+    y - 40
+  );
+
+  ctx.lineTo(
+    840,
+    y - 40
+  );
+
+  ctx.stroke();
+
+
+  ctx.font =
+    '900 28px Arial';
+
+  ctx.fillStyle =
+    '#090909';
+
+
+  ctx.fillText(
+    'SIN INTERESES',
+    60,
+    y + 25
+  );
+
+
+  ctx.font =
+    '500 21px Arial';
+
+  ctx.fillStyle =
+    '#777';
+
+
+  ctx.fillText(
+    'Gracias por comprar en HYPEFRIENDS.',
+    60,
+    y + 70
+  );
+
+
+  return canvas;
+
+}
+
+
+/* =========================================================
+   COMPARTIR IMAGEN
+   ========================================================= */
+
+async function shareReceiptImage(
+  id,
+  amount
+) {
+
+  const sale =
+    state.sales.find(
+      s => s.id === id
+    );
+
+
+  if (!sale) return;
+
+
+  const canvas =
+    buildReceiptCanvas(
+      sale,
+      amount
+    );
+
+
+  canvas.toBlob(
+    async blob => {
+
+      const file =
+        new File(
+          [
+            blob
+          ],
+          `HYPEFRIENDS-${id}.png`,
+          {
+            type: 'image/png'
+          }
+        );
+
+
+      if (
+        navigator.share &&
+        (
+          !navigator.canShare ||
+          navigator.canShare({
+            files: [file]
+          })
+        )
+      ) {
+
+        try {
+
+          await navigator.share({
+
+            title:
+              'Comprobante HYPEFRIENDS',
+
+            text:
+              receiptText(
+                sale,
+                amount
+              ),
+
+            files: [
+              file
+            ]
+
+          });
+
+
+          toast(
+            'Comprobante listo para compartir'
+          );
+
+        } catch (error) {
+
+        }
+
+      } else {
+
+        const url =
+          URL.createObjectURL(
+            blob
+          );
+
+
+        const link =
+          document.createElement(
+            'a'
+          );
+
+
+        link.href =
+          url;
+
+        link.download =
+          `HYPEFRIENDS-${id}.png`;
+
+
+        link.click();
+
+
+        setTimeout(
+          () =>
+            URL.revokeObjectURL(
+              url
+            ),
+          1000
+        );
+
+
+        toast(
+          'Imagen generada'
+        );
+
+      }
+
+    },
+
+    'image/png'
+
+  );
+
+}
+
+
+/* =========================================================
+   COMPARTIR TEXTO
+   ========================================================= */
+
+async function shareReceiptText(
+  id,
+  amount
+) {
+
+  const sale =
+    state.sales.find(
+      s => s.id === id
+    );
+
+
+  if (!sale) return;
+
+
+  const text =
+    receiptText(
+      sale,
+      amount
+    );
+
+
+  if (navigator.share) {
+
+    try {
+
+      await navigator.share({
+
+        title:
+          'Comprobante HYPEFRIENDS',
+
+        text
+
+      });
+
+      return;
+
+    } catch (error) {
+
+    }
+
+  }
+
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+    toast(
+      'Comprobante copiado'
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+}
+
+
+/* =========================================================
+   NUEVO PRODUCTO
+   ========================================================= */
 
 function openProduct() {
 
@@ -3347,9 +3741,9 @@ function openProduct() {
 }
 
 
-// =========================================================
-// CREAR PRODUCTO
-// =========================================================
+/* =========================================================
+   CREAR PRODUCTO
+   ========================================================= */
 
 async function createProduct() {
 
@@ -3365,20 +3759,17 @@ async function createProduct() {
 
     stock:
       Number(
-        $('#pStock').value ||
-        0
+        $('#pStock').value || 0
       ),
 
     cost:
       Number(
-        $('#pCost').value ||
-        0
+        $('#pCost').value || 0
       ),
 
     price:
       Number(
-        $('#pPrice').value ||
-        0
+        $('#pPrice').value || 0
       ),
 
     currency:
@@ -3388,7 +3779,7 @@ async function createProduct() {
 
 
   console.log(
-    'Guardando producto:',
+    '📦 Guardando producto:',
     row
   );
 
@@ -3396,18 +3787,17 @@ async function createProduct() {
   const {
     data,
     error
-  } =
-    await db
-      .from('products')
-      .insert(row)
-      .select()
-      .single();
+  } = await db
+    .from('products')
+    .insert(row)
+    .select()
+    .single();
 
 
   if (error) {
 
     console.error(
-      'ERROR PRODUCTO:',
+      '❌ Error creando producto:',
       error
     );
 
@@ -3419,16 +3809,19 @@ async function createProduct() {
 
 
   console.log(
-    'Producto guardado:',
+    '✅ Producto guardado:',
     data
   );
 
 
   await loadAll();
 
+
   closeModal();
 
+
   render('inventory');
+
 
   toast(
     'PRODUCTO GUARDADO EN LA NUBE'
@@ -3437,9 +3830,9 @@ async function createProduct() {
 }
 
 
-// =========================================================
-// GASTOS
-// =========================================================
+/* =========================================================
+   NUEVO GASTO
+   ========================================================= */
 
 function openExpense() {
 
@@ -3511,9 +3904,9 @@ function openExpense() {
 }
 
 
-// =========================================================
-// CREAR GASTO
-// =========================================================
+/* =========================================================
+   CREAR GASTO
+   ========================================================= */
 
 async function createExpense() {
 
@@ -3525,8 +3918,7 @@ async function createExpense() {
 
     amount:
       Number(
-        $('#eAmount').value ||
-        0
+        $('#eAmount').value || 0
       ),
 
     currency:
@@ -3538,9 +3930,7 @@ async function createExpense() {
   };
 
 
-  if (
-    row.amount <= 0
-  ) {
+  if (row.amount <= 0) {
 
     return toast(
       'Monto inválido'
@@ -3551,10 +3941,9 @@ async function createExpense() {
 
   const {
     error
-  } =
-    await db
-      .from('expenses')
-      .insert(row);
+  } = await db
+    .from('expenses')
+    .insert(row);
 
 
   if (error) {
@@ -3572,9 +3961,12 @@ async function createExpense() {
 
   await loadAll();
 
+
   closeModal();
 
+
   render('finance');
+
 
   toast(
     'GASTO REGISTRADO EN LA NUBE'
@@ -3583,9 +3975,9 @@ async function createExpense() {
 }
 
 
-// =========================================================
-// CLIENTE
-// =========================================================
+/* =========================================================
+   NUEVO CLIENTE
+   ========================================================= */
 
 function openCustomer() {
 
@@ -3648,9 +4040,9 @@ function openCustomer() {
 }
 
 
-// =========================================================
-// CREAR CLIENTE
-// =========================================================
+/* =========================================================
+   CREAR CLIENTE
+   ========================================================= */
 
 async function createCustomer() {
 
@@ -3673,10 +4065,9 @@ async function createCustomer() {
 
   const {
     error
-  } =
-    await db
-      .from('customers')
-      .insert(row);
+  } = await db
+    .from('customers')
+    .insert(row);
 
 
   if (error) {
@@ -3694,9 +4085,12 @@ async function createCustomer() {
 
   await loadAll();
 
+
   closeModal();
 
+
   render('customers');
+
 
   toast(
     'CLIENTE GUARDADO EN LA NUBE'
@@ -3705,79 +4099,11 @@ async function createCustomer() {
 }
 
 
-// =========================================================
-// COMPARTIR TEXTO
-// =========================================================
+/* =========================================================
+   INSTALACIÓN PWA
+   ========================================================= */
 
-async function shareReceiptText(
-  id,
-  amount
-) {
-
-  const sale =
-    state.sales.find(
-      x => x.id === id
-    );
-
-
-  if (!sale) return;
-
-
-  const text =
-    receiptText(
-      sale,
-      amount
-    );
-
-
-  if (
-    navigator.share
-  ) {
-
-    try {
-
-      await navigator.share({
-
-        title:
-          'Comprobante HYPEFRIENDS',
-
-        text
-
-      });
-
-      return;
-
-    } catch (error) {}
-
-  }
-
-
-  try {
-
-    await navigator.clipboard.writeText(
-      text
-    );
-
-    toast(
-      'Comprobante copiado'
-    );
-
-  } catch (error) {
-
-    toast(
-      'No se pudo copiar'
-    );
-
-  }
-
-}
-
-
-// =========================================================
-// INSTALACIÓN PWA
-// =========================================================
-
-let deferredPrompt;
+let deferredPrompt = null;
 
 
 window.addEventListener(
@@ -3786,8 +4112,7 @@ window.addEventListener(
 
     event.preventDefault();
 
-    deferredPrompt =
-      event;
+    deferredPrompt = event;
 
   }
 );
@@ -3795,9 +4120,7 @@ window.addEventListener(
 
 async function installApp() {
 
-  if (
-    deferredPrompt
-  ) {
+  if (deferredPrompt) {
 
     deferredPrompt.prompt();
 
@@ -3814,9 +4137,8 @@ async function installApp() {
 }
 
 
-// =========================================================
-// ARRANQUE
-// =========================================================
+/* =========================================================
+   INICIAR
+   ========================================================= */
 
 boot();
-
