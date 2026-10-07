@@ -1,0 +1,12 @@
+{
+  "name":"HYPEFRIENDS BUSINESS",
+  "short_name":"HF BUSINESS",
+  "description":"Inventario, ventas, abonos y finanzas de HYPEFRIENDS",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#efefed",
+  "theme_color":"#090909",
+  "icons":[
+    {"src":"assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
