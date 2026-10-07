@@ -9,12 +9,12 @@
   <meta name="description" content="Inventario, ventas, apartados y gastos de HYPEFRIENDS BUSINESS." />
   <title>HYPEFRIENDS BUSINESS</title>
   <link rel="manifest" href="./manifest.json" />
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=5" />
 </head>
 <body>
   <section id="loginScreen" class="login-screen">
     <form id="loginForm" class="login-card">
-      <div class="brand login-brand">HYPE<span>FRIENDS</span><small>BUSINESS</small></div>
+      <div class="brand login-brand"><span class="brand-mark">HF</span><span class="brand-name">HYPEFRIENDS</span><small>BUSINESS</small></div>
       <h1>INICIAR SESIÓN</h1>
       <p class="muted login-copy">Ingresa con tu cuenta de HYPEFRIENDS BUSINESS.</p>
       <div class="form">
@@ -31,33 +31,38 @@
   <div id="app" class="hidden-app">
     <aside class="sidebar">
       <div>
-        <div class="brand">HYPE<span>FRIENDS</span><small>BUSINESS</small></div>
+        <div class="brand"><span class="brand-mark">HF</span><span class="brand-name">HYPEFRIENDS</span><small>BUSINESS</small></div>
         <nav aria-label="Navegación">
-          <button class="nav active" data-view="dashboard">Dashboard</button>
-          <button class="nav" data-view="sales">Ventas</button>
-          <button class="nav" data-view="inventory">Inventario</button>
-          <button class="nav" data-view="finance">Gastos</button>
-          <button class="nav" data-view="customers">Clientes</button>
-          <button class="nav" data-view="history">Historial</button>
+          <button class="nav active" data-view="dashboard"><span class="nav-icon">⌂</span>Inicio</button>
+          <button class="nav" data-view="sales"><span class="nav-icon">▣</span>Ventas</button>
+          <button class="nav" data-view="inventory"><span class="nav-icon">▤</span>Inventario</button>
+          <button class="nav" data-view="customers"><span class="nav-icon">♙</span>Clientes</button>
+          <button class="nav" data-view="installments"><span class="nav-icon">▧</span>Apartados</button>
+          <button class="nav" data-view="finance"><span class="nav-icon">▦</span>Gastos</button>
+          <button class="nav" data-view="history"><span class="nav-icon">◷</span>Reportes</button>
         </nav>
       </div>
       <div class="sidebar-bottom">
         <button id="installBtn" class="outline" type="button">INSTALAR APP</button>
         <div class="sync"><i id="syncDot"></i><span id="syncText">Conectando…</span></div>
         <div class="user-box">
+          <span class="avatar">HF</span>
+          <div class="user-info">
           <span id="userEmail"></span>
           <button id="logoutBtn" class="logout" type="button">CERRAR SESIÓN</button>
+          </div>
         </div>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div>
-          <div class="eyebrow">HYPEFRIENDS BUSINESS</div>
-          <h1 id="viewTitle">DASHBOARD</h1>
+        <div class="top-heading">
+          <button id="menuToggle" class="menu-toggle" type="button" aria-label="Abrir menú">☰</button>
+          <div><div class="eyebrow">HYPEFRIENDS BUSINESS</div><h1 id="viewTitle">INICIO</h1></div>
         </div>
         <div class="top-actions">
+          <span class="today-label" id="todayLabel"></span>
           <button id="newSaleBtn" class="primary" type="button">+ NUEVA VENTA</button>
         </div>
       </header>
@@ -74,7 +79,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=5"></script>
+  <script src="./app.js?v=6"></script>
   <script src="./legacy-migration.js?v=1"></script>
 </body>
 </html>
