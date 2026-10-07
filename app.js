@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    HYPEFRIENDS BUSINESS
    SUPABASE + REALTIME + PWA
    ========================================================= */
@@ -9,7 +9,7 @@
    ========================================================= */
 
 const SUPABASE_URL =
-  'https://ynowgseafpcfgvsmkub.supabase.co';
+  'https://ynowgseafcpcfgvsmkub.supabase.co';
 
 const SUPABASE_PUBLISHABLE_KEY =
   'sb_publishable_2DSB2bN-_Q4JAm5WO4QruA_E4sXrEuH';
@@ -31,12 +31,12 @@ if (
     if (el) {
 
       el.textContent =
-        'No se pudo cargar Supabase. Comprueba que index.html cargue correctamente la librería de Supabase.';
+        'No se pudo cargar Supabase. Comprueba que index.html cargue correctamente la librerÃ­a de Supabase.';
     }
 
   });
 
-  throw new Error('Supabase JS no cargó');
+  throw new Error('Supabase JS no cargÃ³');
 
 }
 
@@ -151,7 +151,7 @@ const money = (n, currency = 'CRC') => {
 
   }
 
-  return '₡' +
+  return 'â‚¡' +
     Math.round(Number(n || 0))
       .toLocaleString('es-CR');
 
@@ -199,7 +199,7 @@ const toast = message => {
 
 
 /* =========================================================
-   INDICADOR DE SINCRONIZACIÓN
+   INDICADOR DE SINCRONIZACIÃ“N
    ========================================================= */
 
 function setSync(ok, text) {
@@ -254,10 +254,10 @@ function showLogin(show = true) {
 
 async function boot() {
 
-  console.log('🚀 HYPEFRIENDS BUSINESS iniciando...');
+  console.log('ðŸš€ HYPEFRIENDS BUSINESS iniciando...');
 
   console.log(
-    '🌐 Supabase:',
+    'ðŸŒ Supabase:',
     SUPABASE_URL
   );
 
@@ -311,7 +311,7 @@ async function boot() {
     });
 
 
-  /* Recuperar sesión */
+  /* Recuperar sesiÃ³n */
 
   try {
 
@@ -324,7 +324,7 @@ async function boot() {
     if (error) {
 
       console.error(
-        '❌ Error obteniendo sesión:',
+        'âŒ Error obteniendo sesiÃ³n:',
         error
       );
 
@@ -334,7 +334,7 @@ async function boot() {
     if (session) {
 
       console.log(
-        '✅ Sesión encontrada:',
+        'âœ… SesiÃ³n encontrada:',
         session.user.email
       );
 
@@ -343,7 +343,7 @@ async function boot() {
     } else {
 
       console.log(
-        'ℹ️ No hay sesión activa'
+        'â„¹ï¸ No hay sesiÃ³n activa'
       );
 
       showLogin(true);
@@ -353,7 +353,7 @@ async function boot() {
   } catch (error) {
 
     console.error(
-      '❌ Error de inicio:',
+      'âŒ Error de inicio:',
       error
     );
 
@@ -366,9 +366,9 @@ async function boot() {
     (_event, sessionNow) => {
 
       console.log(
-        '🔐 Auth:',
+        'ðŸ” Auth:',
         _event,
-        sessionNow?.user?.email || 'sin sesión'
+        sessionNow?.user?.email || 'sin sesiÃ³n'
       );
 
 
@@ -413,13 +413,13 @@ async function boot() {
         );
 
       console.log(
-        '✅ Service Worker registrado:',
+        'âœ… Service Worker registrado:',
         registration.scope
       );
 
 
       /*
-        Buscar actualización inmediatamente.
+        Buscar actualizaciÃ³n inmediatamente.
       */
 
       registration.update();
@@ -435,7 +435,7 @@ async function boot() {
         () => {
 
           console.log(
-            '🔄 Nuevo Service Worker activo'
+            'ðŸ”„ Nuevo Service Worker activo'
           );
 
         }
@@ -444,7 +444,7 @@ async function boot() {
     } catch (error) {
 
       console.error(
-        '❌ Error Service Worker:',
+        'âŒ Error Service Worker:',
         error
       );
 
@@ -478,7 +478,7 @@ async function login(event) {
   if (!email || !password) {
 
     $('#loginError').textContent =
-      'Escribe el correo y la contraseña.';
+      'Escribe el correo y la contraseÃ±a.';
 
     return;
 
@@ -502,7 +502,7 @@ async function login(event) {
     if (error) {
 
       console.error(
-        '❌ Supabase login:',
+        'âŒ Supabase login:',
         error
       );
 
@@ -519,7 +519,7 @@ async function login(event) {
       ) {
 
         $('#loginError').textContent =
-          'Este correo todavía no está confirmado en Supabase.';
+          'Este correo todavÃ­a no estÃ¡ confirmado en Supabase.';
 
       } else if (
         message.includes(
@@ -528,7 +528,7 @@ async function login(event) {
       ) {
 
         $('#loginError').textContent =
-          'Correo o contraseña incorrectos.';
+          'Correo o contraseÃ±a incorrectos.';
 
       } else {
 
@@ -543,12 +543,12 @@ async function login(event) {
 
 
     console.log(
-      '✅ Login correcto'
+      'âœ… Login correcto'
     );
 
 
     $('#loginError').textContent =
-      '✓ Acceso correcto.';
+      'âœ“ Acceso correcto.';
 
 
     if (data?.session) {
@@ -560,7 +560,7 @@ async function login(event) {
   } catch (error) {
 
     console.error(
-      '❌ Login exception:',
+      'âŒ Login exception:',
       error
     );
 
@@ -609,7 +609,7 @@ async function logout() {
 async function startApp(session) {
 
   console.log(
-    '🚀 Iniciando aplicación'
+    'ðŸš€ Iniciando aplicaciÃ³n'
   );
 
 
@@ -639,7 +639,7 @@ async function startApp(session) {
 
   /*
     IMPORTANTE:
-    conectar Realtime DESPUÉS de cargar datos.
+    conectar Realtime DESPUÃ‰S de cargar datos.
   */
 
   subscribeRealtime();
@@ -663,7 +663,7 @@ async function startApp(session) {
 function stopApp() {
 
   console.log(
-    '🛑 Cerrando aplicación'
+    'ðŸ›‘ Cerrando aplicaciÃ³n'
   );
 
 
@@ -727,7 +727,7 @@ async function ensureProfile() {
   if (error) {
 
     console.warn(
-      '⚠️ Profile:',
+      'âš ï¸ Profile:',
       error.message
     );
 
@@ -743,7 +743,7 @@ async function ensureProfile() {
 async function loadAll() {
 
   console.log(
-    '☁️ Cargando datos desde Supabase...'
+    'â˜ï¸ Cargando datos desde Supabase...'
   );
 
 
@@ -825,14 +825,14 @@ async function loadAll() {
     if (error) {
 
       console.error(
-        '❌ Error cargando datos:',
+        'âŒ Error cargando datos:',
         error
       );
 
 
       setSync(
         false,
-        'Error de conexión'
+        'Error de conexiÃ³n'
       );
 
 
@@ -882,7 +882,7 @@ async function loadAll() {
 
 
     console.log(
-      '✅ Datos cargados:',
+      'âœ… Datos cargados:',
       {
         products: state.products.length,
         customers: state.customers.length,
@@ -912,7 +912,7 @@ async function loadAll() {
   } catch (error) {
 
     console.error(
-      '❌ loadAll exception:',
+      'âŒ loadAll exception:',
       error
     );
 
@@ -934,7 +934,7 @@ async function loadAll() {
 async function seedProducts() {
 
   console.log(
-    '🌱 Creando productos iniciales...'
+    'ðŸŒ± Creando productos iniciales...'
   );
 
 
@@ -952,7 +952,7 @@ async function seedProducts() {
   if (error) {
 
     console.warn(
-      '⚠️ Seed products:',
+      'âš ï¸ Seed products:',
       error.message
     );
 
@@ -980,7 +980,7 @@ function subscribeRealtime() {
   if (state.realtime) {
 
     console.log(
-      '♻️ Eliminando canal Realtime anterior'
+      'â™»ï¸ Eliminando canal Realtime anterior'
     );
 
     db.removeChannel(
@@ -995,7 +995,7 @@ function subscribeRealtime() {
   if (!state.user) {
 
     console.warn(
-      '⚠️ Realtime: no existe usuario'
+      'âš ï¸ Realtime: no existe usuario'
     );
 
     return;
@@ -1004,7 +1004,7 @@ function subscribeRealtime() {
 
 
   /*
-    Nombre único del canal.
+    Nombre Ãºnico del canal.
   */
 
   const channelName =
@@ -1012,7 +1012,7 @@ function subscribeRealtime() {
 
 
   console.log(
-    '📡 Creando canal:',
+    'ðŸ“¡ Creando canal:',
     channelName
   );
 
@@ -1045,7 +1045,7 @@ function subscribeRealtime() {
   tables.forEach(table => {
 
     console.log(
-      `👂 Escuchando Realtime: ${table}`
+      `ðŸ‘‚ Escuchando Realtime: ${table}`
     );
 
 
@@ -1066,7 +1066,7 @@ function subscribeRealtime() {
       async payload => {
 
         console.log(
-          `🔄 REALTIME RECIBIDO → ${table}`,
+          `ðŸ”„ REALTIME RECIBIDO â†’ ${table}`,
           payload
         );
 
@@ -1096,7 +1096,7 @@ function subscribeRealtime() {
         } catch (error) {
 
           console.error(
-            '❌ Error procesando Realtime:',
+            'âŒ Error procesando Realtime:',
             error
           );
 
@@ -1118,7 +1118,7 @@ function subscribeRealtime() {
       (status, error) => {
 
         console.log(
-          '📡 REALTIME STATUS:',
+          'ðŸ“¡ REALTIME STATUS:',
           status,
           error || ''
         );
@@ -1129,7 +1129,7 @@ function subscribeRealtime() {
         ) {
 
           console.log(
-            '✅✅ REALTIME CONECTADO'
+            'âœ…âœ… REALTIME CONECTADO'
           );
 
 
@@ -1146,14 +1146,14 @@ function subscribeRealtime() {
         ) {
 
           console.error(
-            '❌ REALTIME CHANNEL ERROR:',
+            'âŒ REALTIME CHANNEL ERROR:',
             error
           );
 
 
           setSync(
             false,
-            'Error de sincronización'
+            'Error de sincronizaciÃ³n'
           );
 
         }
@@ -1164,7 +1164,7 @@ function subscribeRealtime() {
         ) {
 
           console.warn(
-            '⏱️ REALTIME TIMEOUT'
+            'â±ï¸ REALTIME TIMEOUT'
           );
 
 
@@ -1195,13 +1195,13 @@ function subscribeRealtime() {
         ) {
 
           console.warn(
-            '🔌 REALTIME CERRADO'
+            'ðŸ”Œ REALTIME CERRADO'
           );
 
 
           setSync(
             false,
-            'Sincronización desconectada'
+            'SincronizaciÃ³n desconectada'
           );
 
         }
@@ -1461,7 +1461,7 @@ function dashboard(c) {
         <div class="section-title">
 
           <h2>
-            ÚLTIMAS VENTAS
+            ÃšLTIMAS VENTAS
           </h2>
 
           <button
@@ -1525,7 +1525,7 @@ function dashboard(c) {
 
             <div class="metric">
               ${money(crc.expenses, 'CRC')}
-              ·
+              Â·
               ${money(usd.expenses, 'USD')}
             </div>
 
@@ -1701,7 +1701,7 @@ function saleTable(n = 99) {
                   colspan="5"
                   class="muted"
                 >
-                  No hay ventas todavía.
+                  No hay ventas todavÃ­a.
                 </td>
 
               </tr>
@@ -1812,7 +1812,7 @@ function inventory(c) {
                   product.currency
                 )}
 
-                ·
+                Â·
 
                 Costo:
                 ${money(
@@ -1910,7 +1910,7 @@ function finance(c) {
 
           ${money(crc.expenses, 'CRC')}
 
-          ·
+          Â·
 
           ${money(usd.expenses, 'USD')}
 
@@ -2065,7 +2065,7 @@ function customers(c) {
               <div class="muted">
                 ${escapeHtml(
                   customer.phone ||
-                  'Sin teléfono'
+                  'Sin telÃ©fono'
                 )}
               </div>
 
@@ -2126,7 +2126,7 @@ function history(c) {
         type: 'Pago',
 
         desc:
-          `${sale.customer} · ${sale.id}`,
+          `${sale.customer} Â· ${sale.id}`,
 
         amount:
           payment.amount,
@@ -2380,14 +2380,14 @@ function openSale() {
                     product.name
                   )}
 
-                  —
+                  â€”
 
                   ${money(
                     product.price,
                     product.currency
                   )}
 
-                  —
+                  â€”
 
                   stock
                   ${product.stock}
@@ -2440,7 +2440,7 @@ function openSale() {
         TOTAL
 
         <strong id="saleTotal">
-          ₡0
+          â‚¡0
         </strong>
 
         <small
@@ -2517,7 +2517,7 @@ function updateSaleTotal() {
   $('#saleCurrencyHint').textContent =
     `Moneda de la venta: ${
       product.currency === 'USD'
-        ? 'Dólares'
+        ? 'DÃ³lares'
         : 'Colones'
     }`;
 
@@ -2558,7 +2558,7 @@ async function createSale() {
   if (!product || quantity <= 0) {
 
     return toast(
-      'Datos de venta inválidos'
+      'Datos de venta invÃ¡lidos'
     );
 
   }
@@ -2676,7 +2676,7 @@ async function createSale() {
     );
 
     toast(
-      'Venta creada, pero falló el detalle'
+      'Venta creada, pero fallÃ³ el detalle'
     );
 
   }
@@ -2795,7 +2795,7 @@ function openPayment(id) {
         )}
       </b>
 
-      ·
+      Â·
 
       ${escapeHtml(
         sale.id
@@ -2890,7 +2890,7 @@ async function addPayment(id) {
   ) {
 
     return toast(
-      'Monto de abono inválido'
+      'Monto de abono invÃ¡lido'
     );
 
   }
@@ -2963,7 +2963,7 @@ async function addPayment(id) {
     );
 
     return toast(
-      'Abono creado, pero no se actualizó la venta'
+      'Abono creado, pero no se actualizÃ³ la venta'
     );
 
   }
@@ -3031,7 +3031,7 @@ function showReceipt(
       </div>
 
       <div class="muted">
-        STREETWEAR & DROPS · COMPROBANTE DE PAGO
+        STREETWEAR & DROPS Â· COMPROBANTE DE PAGO
       </div>
 
       <hr>
@@ -3160,7 +3160,7 @@ function showReceipt(
         class="primary"
         onclick="shareReceiptImage('${sale.id}',${Number(amount)})"
       >
-        📲 COMPARTIR IMAGEN
+        ðŸ“² COMPARTIR IMAGEN
       </button>
 
 
@@ -3244,7 +3244,7 @@ function buildReceiptCanvas(
     '700 22px Arial';
 
   ctx.fillText(
-    'BUSINESS · COMPROBANTE DE PAGO',
+    'BUSINESS Â· COMPROBANTE DE PAGO',
     60,
     135
   );
@@ -3652,7 +3652,7 @@ function openProduct() {
 
         <label>
 
-          Categoría
+          CategorÃ­a
 
           <input
             id="pCat"
@@ -3715,11 +3715,11 @@ function openProduct() {
         <select id="pCurrency">
 
           <option value="CRC">
-            ₡ Colones
+            â‚¡ Colones
           </option>
 
           <option value="USD">
-            $ Dólares
+            $ DÃ³lares
           </option>
 
         </select>
@@ -3779,7 +3779,7 @@ async function createProduct() {
 
 
   console.log(
-    '📦 Guardando producto:',
+    'ðŸ“¦ Guardando producto:',
     row
   );
 
@@ -3797,7 +3797,7 @@ async function createProduct() {
   if (error) {
 
     console.error(
-      '❌ Error creando producto:',
+      'âŒ Error creando producto:',
       error
     );
 
@@ -3809,7 +3809,7 @@ async function createProduct() {
 
 
   console.log(
-    '✅ Producto guardado:',
+    'âœ… Producto guardado:',
     data
   );
 
@@ -3851,7 +3851,7 @@ function openExpense() {
 
         <input
           id="eNote"
-          placeholder="Compra de mercadería, envío..."
+          placeholder="Compra de mercaderÃ­a, envÃ­o..."
         >
 
       </label>
@@ -3878,11 +3878,11 @@ function openExpense() {
         <select id="eCurrency">
 
           <option value="CRC">
-            ₡ Colones
+            â‚¡ Colones
           </option>
 
           <option value="USD">
-            $ Dólares
+            $ DÃ³lares
           </option>
 
         </select>
@@ -3933,7 +3933,7 @@ async function createExpense() {
   if (row.amount <= 0) {
 
     return toast(
-      'Monto inválido'
+      'Monto invÃ¡lido'
     );
 
   }
@@ -4004,7 +4004,7 @@ function openCustomer() {
 
       <label>
 
-        Teléfono
+        TelÃ©fono
 
         <input
           id="cPhone"
@@ -4100,7 +4100,7 @@ async function createCustomer() {
 
 
 /* =========================================================
-   INSTALACIÓN PWA
+   INSTALACIÃ“N PWA
    ========================================================= */
 
 let deferredPrompt = null;
@@ -4129,7 +4129,7 @@ async function installApp() {
   } else {
 
     toast(
-      'En iPhone usa Compartir → Agregar a pantalla de inicio'
+      'En iPhone usa Compartir â†’ Agregar a pantalla de inicio'
     );
 
   }
