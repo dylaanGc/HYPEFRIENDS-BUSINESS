@@ -184,14 +184,64 @@ async function seedProducts() {
 }
 
 function subscribeRealtime() {
-  if (state.realtime) db.removeChannel(state.realtime);
-  const tables = ['products','customers','sales','sale_items','payments','expenses'];
-  let channel = db.channel('hypefriends-business-sync');
+  if (state.realtime) {
+    db.removeChannel(state.realtime);
+    state.realtime = null;
+  }
+
+  const tables = [
+    'products',
+    'customers',
+    'sales',
+    'sale_items',
+    'payments',
+    'expenses'
+  ];
+
+  const channel = db.channel(`hypefriends-business-sync-${state.user.id}`);
+
   tables.forEach(table => {
-    channel = channel.on('postgres_changes', {event:'*', schema:'public', table}, async () => {
-      await loadAll();
-      render(state.view);
-    });
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: table
+      },
+      async (payload) => {
+        console.log('🔄 Cambio recibido:', table, payload);
+
+        await loadAll();
+        render(state.view);
+
+        setSync(true, 'Sincronizado en tiempo real');
+      }
+    );
+  });
+
+  state.realtime = channel.subscribe((status, err) => {
+    console.log('📡 Realtime:', status, err || '');
+
+    if (status === 'SUBSCRIBED') {
+      setSync(true, 'Sincronizado en tiempo real');
+      console.log('✅ Realtime conectado');
+    }
+
+    if (status === 'CHANNEL_ERROR') {
+      setSync(false, 'Error de sincronización');
+      console.error('❌ Error Realtime:', err);
+    }
+
+    if (status === 'TIMED_OUT') {
+      setSync(false, 'Reintentando sincronización...');
+    }
+
+    if (status === 'CLOSED') {
+      setSync(false, 'Sincronización desconectada');
+    }
+  });
+}
+
   });
   state.realtime = channel.subscribe(status => {
     if (status === 'SUBSCRIBED') setSync(true, 'Sincronizado en tiempo real');
