@@ -1,25 +1,34 @@
 /* =========================================================
-   HYPEFRIENDS BUSINESS — SUPABASE / PWA
+   HYPEFRIENDS BUSINESS
+   SUPABASE + MULTI DISPOSITIVO + REALTIME + AUTO SYNC
    ========================================================= */
 
 const SUPABASE_URL = 'https://ynowgseafpcfgvsmkub.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_2DSB2bN-_Q4JAm5WO4QruA_E4sXrEuH';
 
-if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+const SUPABASE_PUBLISHABLE_KEY =
+  'sb_publishable_2DSB2bN-_Q4JAm5WO4QruA_E4sXrEuH';
+
+
+// =========================================================
+// SUPABASE
+// =========================================================
+
+if (
+  !window.supabase ||
+  typeof window.supabase.createClient !== 'function'
+) {
   document.addEventListener('DOMContentLoaded', () => {
     const el = document.querySelector('#loginError');
+
     if (el) {
       el.textContent =
-        'No se pudo cargar Supabase. Abre la aplicación desde HTTPS.';
+        'No se pudo cargar Supabase. Recarga la página.';
     }
   });
 
   throw new Error('Supabase JS no cargó');
 }
 
-/* =========================================================
-   SUPABASE
-   ========================================================= */
 
 const db = window.supabase.createClient(
   SUPABASE_URL,
@@ -29,37 +38,52 @@ const db = window.supabase.createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true
+    },
+
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
     }
   }
 );
 
-/* =========================================================
-   ESTADO
-   ========================================================= */
 
-const $ = selector => document.querySelector(selector);
+// =========================================================
+// ESTADO
+// =========================================================
 
 const state = {
+
   user: null,
+
   session: null,
 
   sales: [],
+
   products: [],
+
   expenses: [],
+
   customers: [],
 
   view: 'dashboard',
 
   realtime: null,
 
+  syncTimer: null,
+
   loading: false
+
 };
 
-/* =========================================================
-   PRODUCTOS POR DEFECTO
-   ========================================================= */
+
+// =========================================================
+// PRODUCTOS INICIALES
+// =========================================================
 
 const DEFAULT_PRODUCTS = [
+
   {
     name: 'CORE HOODIE',
     category: 'Hoodie',
@@ -68,6 +92,7 @@ const DEFAULT_PRODUCTS = [
     price: 48000,
     currency: 'CRC'
   },
+
   {
     name: 'SHORT CORTEIZ',
     category: 'Shorts',
@@ -76,6 +101,7 @@ const DEFAULT_PRODUCTS = [
     price: 25000,
     currency: 'CRC'
   },
+
   {
     name: 'CAP CHROME HEARTS',
     category: 'Gorra',
@@ -84,6 +110,7 @@ const DEFAULT_PRODUCTS = [
     price: 15000,
     currency: 'CRC'
   },
+
   {
     name: 'CAMISETA CHROME HEARTS',
     category: 'Camiseta',
@@ -92,232 +119,351 @@ const DEFAULT_PRODUCTS = [
     price: 28000,
     currency: 'CRC'
   }
+
 ];
 
-/* =========================================================
-   UTILIDADES
-   ========================================================= */
+
+// =========================================================
+// UTILIDADES
+// =========================================================
+
+const $ = selector =>
+  document.querySelector(selector);
+
 
 const money = (n, currency = 'CRC') => {
-  return currency === 'USD'
-    ? '$' +
-        Number(n || 0).toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })
-    : '₡' +
-        Math.round(Number(n || 0)).toLocaleString('es-CR');
+
+  const value = Number(n || 0);
+
+  if (currency === 'USD') {
+
+    return '$' +
+      value.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
+  }
+
+  return '₡' +
+    Math.round(value).toLocaleString('es-CR');
+
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
 
-const escapeHtml = value => {
-  return String(value ?? '').replace(/[&<>'"]/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-  }[ch]));
-};
+const today = () =>
+  new Date().toISOString().slice(0, 10);
+
+
+const escapeHtml = value =>
+  String(value ?? '').replace(
+    /[&<>'"]/g,
+    ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[ch])
+  );
+
 
 const toast = message => {
+
   const t = $('#toast');
 
   if (!t) return;
 
   t.textContent = message;
+
   t.classList.add('show');
 
   setTimeout(() => {
     t.classList.remove('show');
   }, 2200);
+
 };
 
-/* =========================================================
-   INDICADOR DE SINCRONIZACIÓN
-   ========================================================= */
+
+// =========================================================
+// ESTADO DE SINCRONIZACIÓN
+// =========================================================
 
 function setSync(ok, text) {
+
   const dot = $('#syncDot');
+
   const label = $('#syncText');
 
   if (dot) {
-    dot.style.background = ok ? '#4caf74' : '#c86643';
+
+    dot.style.background =
+      ok ? '#4caf74' : '#c86643';
+
   }
 
   if (label) {
+
     label.textContent = text;
+
   }
+
 }
 
-/* =========================================================
-   LOGIN
-   ========================================================= */
+
+// =========================================================
+// LOGIN
+// =========================================================
 
 function showLogin(show = true) {
-  $('#loginScreen')?.classList.toggle('hidden', !show);
 
-  $('#app')?.classList.toggle('app-visible', !show);
+  const login = $('#loginScreen');
 
-  $('#app')?.classList.toggle('hidden-app', show);
-}
+  const app = $('#app');
 
-/* =========================================================
-   BOOT
-   ========================================================= */
+  if (login) {
 
-async function boot() {
-  try {
-    const loginForm = $('#loginForm');
-
-    if (loginForm) {
-      loginForm.addEventListener('submit', login);
-    }
-
-    $('#logoutBtn')?.addEventListener('click', logout);
-
-    if ($('#closeModal')) {
-      $('#closeModal').onclick = closeModal;
-    }
-
-    if ($('#newSaleBtn')) {
-      $('#newSaleBtn').onclick = openSale;
-    }
-
-    if ($('#installBtn')) {
-      $('#installBtn').onclick = installApp;
-    }
-
-    document.querySelectorAll('.nav').forEach(button => {
-      button.onclick = () => {
-        render(button.dataset.view);
-      };
-    });
-
-    console.log('=================================');
-    console.log('HYPEFRIENDS BUSINESS');
-    console.log('Supabase iniciado');
-    console.log('URL:', SUPABASE_URL);
-    console.log('=================================');
-
-    const {
-      data: { session },
-      error
-    } = await db.auth.getSession();
-
-    if (error) {
-      console.error('Error obteniendo sesión:', error);
-    }
-
-    if (session) {
-      await startApp(session);
-    }
-
-    db.auth.onAuthStateChange((_event, sessionNow) => {
-      setTimeout(async () => {
-        if (sessionNow) {
-          if (
-            !state.session ||
-            state.session.access_token !== sessionNow.access_token
-          ) {
-            await startApp(sessionNow);
-          }
-        } else {
-          stopApp();
-        }
-      }, 0);
-    });
-
-    /* =====================================================
-       SERVICE WORKER
-       ===================================================== */
-
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration =
-          await navigator.serviceWorker.register('./sw.js');
-
-        console.log(
-          '✅ Service Worker registrado:',
-          registration.scope
-        );
-
-        /*
-         * Si hay una nueva versión del SW,
-         * intenta activarla inmediatamente.
-         */
-
-        if (registration.waiting) {
-          registration.waiting.postMessage({
-            type: 'SKIP_WAITING'
-          });
-        }
-
-        registration.addEventListener('updatefound', () => {
-          const worker = registration.installing;
-
-          if (!worker) return;
-
-          worker.addEventListener('statechange', () => {
-            if (
-              worker.state === 'installed' &&
-              navigator.serviceWorker.controller
-            ) {
-              console.log('🔄 Nueva versión de la app disponible');
-
-              worker.postMessage({
-                type: 'SKIP_WAITING'
-              });
-            }
-          });
-        });
-
-      } catch (error) {
-        console.error(
-          '❌ Error registrando Service Worker:',
-          error
-        );
-      }
-    }
-
-    /*
-     * Cuando el SW cambia, recarga la página.
-     */
-
-    navigator.serviceWorker?.addEventListener(
-      'controllerchange',
-      () => {
-        console.log('🔄 Service Worker actualizado');
-      }
+    login.classList.toggle(
+      'hidden',
+      !show
     );
 
-  } catch (error) {
-    console.error('Error en boot:', error);
   }
+
+  if (app) {
+
+    app.classList.toggle(
+      'app-visible',
+      !show
+    );
+
+    app.classList.toggle(
+      'hidden-app',
+      show
+    );
+
+  }
+
 }
 
-/* =========================================================
-   LOGIN
-   ========================================================= */
 
-async function login(event) {
-  event.preventDefault();
+// =========================================================
+// BOOT
+// =========================================================
 
-  const email = $('#loginEmail')?.value.trim();
-  const password = $('#loginPassword')?.value;
+async function boot() {
+
+  console.log('================================');
+  console.log('HYPEFRIENDS BUSINESS');
+  console.log('Supabase iniciado');
+  console.log('URL:', SUPABASE_URL);
+  console.log('================================');
+
+
+  const loginForm = $('#loginForm');
+
+  if (loginForm) {
+
+    loginForm.addEventListener(
+      'submit',
+      login
+    );
+
+  }
+
+
+  const logoutBtn = $('#logoutBtn');
+
+  if (logoutBtn) {
+
+    logoutBtn.addEventListener(
+      'click',
+      logout
+    );
+
+  }
+
+
+  const closeModalBtn = $('#closeModal');
+
+  if (closeModalBtn) {
+
+    closeModalBtn.onclick =
+      closeModal;
+
+  }
+
+
+  const newSaleBtn = $('#newSaleBtn');
+
+  if (newSaleBtn) {
+
+    newSaleBtn.onclick =
+      openSale;
+
+  }
+
+
+  const installBtn = $('#installBtn');
+
+  if (installBtn) {
+
+    installBtn.onclick =
+      installApp;
+
+  }
+
+
+  document
+    .querySelectorAll('.nav')
+    .forEach(button => {
+
+      button.onclick = () =>
+        render(button.dataset.view);
+
+    });
+
+
+  // -------------------------------------------------------
+  // SESIÓN
+  // -------------------------------------------------------
+
+  const {
+    data: {
+      session
+    }
+  } = await db.auth.getSession();
+
+
+  console.log(
+    'Sesión encontrada:',
+    !!session
+  );
+
+
+  if (session) {
+
+    await startApp(session);
+
+  }
+
+
+  // -------------------------------------------------------
+  // CAMBIOS DE LOGIN
+  // -------------------------------------------------------
+
+  db.auth.onAuthStateChange(
+    (_event, sessionNow) => {
+
+      console.log(
+        'Auth:',
+        _event
+      );
+
+
+      setTimeout(() => {
+
+        if (sessionNow) {
+
+          if (
+            !state.session ||
+            state.session.access_token !==
+            sessionNow.access_token
+          ) {
+
+            startApp(sessionNow);
+
+          }
+
+        } else {
+
+          stopApp();
+
+        }
+
+      }, 0);
+
+    }
+  );
+
+
+  // -------------------------------------------------------
+  // SERVICE WORKER
+  // -------------------------------------------------------
+
+  if ('serviceWorker' in navigator) {
+
+    try {
+
+      const registration =
+        await navigator.serviceWorker.register(
+          './sw.js',
+          {
+            updateViaCache: 'none'
+          }
+        );
+
+      console.log(
+        'Service Worker:',
+        registration
+      );
+
+      await registration.update();
+
+    } catch (error) {
+
+      console.error(
+        'Error Service Worker:',
+        error
+      );
+
+    }
+
+  }
+
+}
+
+
+// =========================================================
+// LOGIN
+// =========================================================
+
+async function login(e) {
+
+  e.preventDefault();
+
+
+  const email =
+    $('#loginEmail')?.value.trim();
+
+  const password =
+    $('#loginPassword')?.value;
+
 
   if ($('#loginError')) {
-    $('#loginError').textContent = 'Conectando...';
+
+    $('#loginError').textContent =
+      'Conectando...';
+
   }
+
 
   if (!email || !password) {
-    $('#loginError').textContent =
-      'Escribe el correo y la contraseña.';
+
+    if ($('#loginError')) {
+
+      $('#loginError').textContent =
+        'Escribe el correo y la contraseña.';
+
+    }
+
     return;
+
   }
 
+
   try {
+
     const {
       data,
       error
@@ -326,196 +472,296 @@ async function login(event) {
       password
     });
 
+
     if (error) {
-      console.error('Supabase login error:', error);
 
-      const msg = String(error.message || '').toLowerCase();
+      console.error(
+        'Supabase login:',
+        error
+      );
 
-      if (msg.includes('email not confirmed')) {
+
+      if ($('#loginError')) {
+
         $('#loginError').textContent =
-          'Este correo todavía no está confirmado en Supabase.';
-      } else if (msg.includes('invalid login credentials')) {
-        $('#loginError').textContent =
-          'Correo o contraseña incorrectos.';
-      } else if (
-        msg.includes('failed to fetch') ||
-        msg.includes('network')
-      ) {
-        $('#loginError').textContent =
-          'No se puede conectar con Supabase.';
-      } else {
-        $('#loginError').textContent =
-          `Error de Supabase: ${error.message}`;
+          error.message;
+
       }
 
       return;
+
     }
 
-    $('#loginError').textContent =
-      '✓ Acceso correcto. Cargando HYPEFRIENDS BUSINESS...';
 
-    if (data?.session) {
-      await startApp(data.session);
-    }
-
-  } catch (error) {
-    console.error('Login exception:', error);
-
-    $('#loginError').textContent =
-      `Error inesperado: ${error.message || error}`;
-  }
-}
-
-/* =========================================================
-   LOGOUT
-   ========================================================= */
-
-async function logout() {
-  try {
-    await db.auth.signOut();
-  } catch (error) {
-    console.error('Logout:', error);
-  }
-}
-
-/* =========================================================
-   INICIAR APP
-   ========================================================= */
-
-async function startApp(session) {
-  try {
-    state.session = session;
-    state.user = session.user;
-
-    $('#userEmail').textContent =
-      state.user.email || 'Usuario';
-
-    showLogin(false);
-
-    setSync(true, 'Conectando con Supabase...');
-
-    await ensureProfile();
-
-    await loadAll();
-
-    /*
-     * IMPORTANTE:
-     * Primero cargamos datos y luego conectamos Realtime.
-     */
-
-    subscribeRealtime();
-
-    render(state.view);
-
-    setSync(
-      true,
-      'Supabase conectado · Tiempo real activo'
+    console.log(
+      'Login correcto'
     );
 
-    console.log('=================================');
-    console.log('✅ APP CONECTADA A SUPABASE');
-    console.log('Usuario:', state.user.email);
-    console.log('User ID:', state.user.id);
-    console.log('=================================');
+
+    if (data?.session) {
+
+      await startApp(
+        data.session
+      );
+
+    }
 
   } catch (error) {
-    console.error('Error iniciando app:', error);
 
-    setSync(false, 'Error de conexión');
+    console.error(
+      error
+    );
+
+
+    if ($('#loginError')) {
+
+      $('#loginError').textContent =
+        error.message ||
+        'Error inesperado';
+
+    }
+
   }
+
 }
 
-/* =========================================================
-   DETENER APP
-   ========================================================= */
+
+// =========================================================
+// LOGOUT
+// =========================================================
+
+async function logout() {
+
+  stopAutoSync();
+
+  if (state.realtime) {
+
+    await db.removeChannel(
+      state.realtime
+    );
+
+    state.realtime = null;
+
+  }
+
+
+  await db.auth.signOut();
+
+}
+
+
+// =========================================================
+// START APP
+// =========================================================
+
+async function startApp(session) {
+
+  console.log(
+    'Iniciando aplicación...'
+  );
+
+
+  state.session = session;
+
+  state.user = session.user;
+
+
+  const email =
+    state.user.email ||
+    'Usuario';
+
+
+  if ($('#userEmail')) {
+
+    $('#userEmail').textContent =
+      email;
+
+  }
+
+
+  showLogin(false);
+
+
+  setSync(
+    true,
+    'Conectando con Supabase...'
+  );
+
+
+  await ensureProfile();
+
+
+  await loadAll();
+
+
+  subscribeRealtime();
+
+
+  startAutoSync();
+
+
+  render(state.view);
+
+
+  setSync(
+    true,
+    'Sincronizado con Supabase'
+  );
+
+
+  console.log(
+    'Aplicación lista'
+  );
+
+}
+
+
+// =========================================================
+// STOP APP
+// =========================================================
 
 function stopApp() {
+
+  stopAutoSync();
+
+
   if (state.realtime) {
-    db.removeChannel(state.realtime);
+
+    db.removeChannel(
+      state.realtime
+    );
+
   }
+
 
   state.realtime = null;
 
   state.user = null;
+
   state.session = null;
 
   state.sales = [];
+
   state.products = [];
+
   state.expenses = [];
+
   state.customers = [];
+
 
   showLogin(true);
 
-  setSync(false, 'Desconectado');
 }
 
-/* =========================================================
-   PERFIL
-   ========================================================= */
+
+// =========================================================
+// PERFIL
+// =========================================================
 
 async function ensureProfile() {
+
   if (!state.user) return;
+
 
   const {
     error
-  } = await db.from('profiles').upsert(
-    {
-      id: state.user.id,
-      name:
-        state.user.user_metadata?.name ||
-        state.user.email?.split('@')[0] ||
-        'Socio'
-    },
-    {
-      onConflict: 'id'
-    }
-  );
+  } = await db
+    .from('profiles')
+    .upsert(
+      {
+        id: state.user.id,
+
+        name:
+          state.user.user_metadata?.name ||
+          state.user.email?.split('@')[0] ||
+          'Socio'
+      },
+      {
+        onConflict: 'id'
+      }
+    );
+
 
   if (error) {
-    console.warn('Profile:', error.message);
+
+    console.warn(
+      'Profile:',
+      error.message
+    );
+
   }
+
 }
 
-/* =========================================================
-   CARGAR TODOS LOS DATOS
-   ========================================================= */
+
+// =========================================================
+// CARGAR TODO
+// =========================================================
 
 async function loadAll() {
+
+  if (!state.user) return;
+
+
   if (state.loading) {
+
     return;
+
   }
+
 
   state.loading = true;
 
+
   try {
-    setSync(true, 'Cargando datos...');
+
+    setSync(
+      true,
+      'Actualizando datos...'
+    );
+
 
     const [
+
       productsResult,
+
       customersResult,
+
       expensesResult,
+
       salesResult
+
     ] = await Promise.all([
+
       db
         .from('products')
         .select('*')
-        .order('created_at', {
-          ascending: true
-        }),
+        .order(
+          'created_at',
+          {
+            ascending: true
+          }
+        ),
 
       db
         .from('customers')
         .select('*')
-        .order('created_at', {
-          ascending: true
-        }),
+        .order(
+          'created_at',
+          {
+            ascending: true
+          }
+        ),
 
       db
         .from('expenses')
         .select('*')
-        .order('created_at', {
-          ascending: true
-        }),
+        .order(
+          'created_at',
+          {
+            ascending: true
+          }
+        ),
 
       db
         .from('sales')
@@ -525,612 +771,780 @@ async function loadAll() {
           sale_items(*,products(name)),
           payments(*)
         `)
-        .order('created_at', {
-          ascending: true
-        })
+        .order(
+          'created_at',
+          {
+            ascending: true
+          }
+        )
+
     ]);
 
+
+    // -----------------------------------------------------
+    // ERRORES
+    // -----------------------------------------------------
+
     if (productsResult.error) {
+
       console.error(
-        '❌ Products:',
+        'PRODUCTS ERROR:',
         productsResult.error
       );
+
     }
+
 
     if (customersResult.error) {
+
       console.error(
-        '❌ Customers:',
+        'CUSTOMERS ERROR:',
         customersResult.error
       );
+
     }
+
 
     if (expensesResult.error) {
+
       console.error(
-        '❌ Expenses:',
+        'EXPENSES ERROR:',
         expensesResult.error
       );
+
     }
+
 
     if (salesResult.error) {
+
       console.error(
-        '❌ Sales:',
+        'SALES ERROR:',
         salesResult.error
       );
+
     }
 
-    const error =
-      productsResult.error ||
-      customersResult.error ||
-      expensesResult.error ||
-      salesResult.error;
 
-    if (error) {
-      setSync(false, 'Error leyendo Supabase');
+    // -----------------------------------------------------
+    // GUARDAR ESTADO
+    // -----------------------------------------------------
 
-      toast(
-        'No se pudieron cargar los datos de Supabase'
+    state.products =
+      productsResult.data || [];
+
+
+    state.customers =
+      customersResult.data || [];
+
+
+    state.expenses =
+      expensesResult.data || [];
+
+
+    state.sales =
+      (salesResult.data || []).map(
+        sale => ({
+
+          ...sale,
+
+          customer:
+            sale.customers?.name ||
+            'Cliente',
+
+          payments:
+            (sale.payments || [])
+              .sort(
+                (a, b) =>
+                  String(
+                    a.created_at
+                  ).localeCompare(
+                    String(
+                      b.created_at
+                    )
+                  )
+              )
+
+        })
       );
 
-      return;
-    }
 
-    state.products = productsResult.data || [];
+    // -----------------------------------------------------
+    // PRODUCTOS INICIALES
+    // -----------------------------------------------------
 
-    state.customers = customersResult.data || [];
+    if (
+      !state.products.length
+    ) {
 
-    state.expenses = expensesResult.data || [];
-
-    state.sales = (salesResult.data || []).map(sale => ({
-      ...sale,
-
-      customer:
-        sale.customers?.name || 'Cliente',
-
-      payments: (sale.payments || []).sort(
-        (a, b) =>
-          String(a.created_at).localeCompare(
-            String(b.created_at)
-          )
-      )
-    }));
-
-    if (!state.products.length) {
       await seedProducts();
+
     }
+
+
+    console.log(
+      'Datos cargados:',
+      {
+        products:
+          state.products.length,
+
+        customers:
+          state.customers.length,
+
+        expenses:
+          state.expenses.length,
+
+        sales:
+          state.sales.length
+      }
+    );
+
 
     setSync(
       true,
-      'Datos cargados desde Supabase'
+      'Sincronizado'
     );
 
-    console.log(
-      '📦 Productos:',
-      state.products.length
+
+  } catch (error) {
+
+    console.error(
+      'LOAD ALL ERROR:',
+      error
     );
 
-    console.log(
-      '👥 Clientes:',
-      state.customers.length
+
+    setSync(
+      false,
+      'Error de sincronización'
     );
 
-    console.log(
-      '💰 Ventas:',
-      state.sales.length
-    );
-
-    console.log(
-      '💸 Gastos:',
-      state.expenses.length
-    );
 
   } finally {
+
     state.loading = false;
+
   }
+
 }
 
-/* =========================================================
-   PRODUCTOS INICIALES
-   ========================================================= */
+
+// =========================================================
+// PRODUCTOS INICIALES
+// =========================================================
 
 async function seedProducts() {
+
   const {
     data,
     error
   } = await db
     .from('products')
-    .insert(DEFAULT_PRODUCTS)
+    .insert(
+      DEFAULT_PRODUCTS
+    )
     .select();
 
-  if (error) {
+
+  if (!error) {
+
+    state.products =
+      data || [];
+
+  } else {
+
     console.warn(
       'Seed products:',
       error.message
     );
 
-    return;
   }
 
-  state.products = data || [];
 }
 
-/* =========================================================
-   REALTIME SUPABASE
-   ========================================================= */
+
+// =========================================================
+// REALTIME
+// =========================================================
 
 function subscribeRealtime() {
 
-  /*
-   * Elimina canal anterior.
-   */
+  console.log(
+    'Configurando Supabase Realtime...'
+  );
+
 
   if (state.realtime) {
-    console.log(
-      '♻️ Eliminando canal Realtime anterior'
-    );
 
-    db.removeChannel(state.realtime);
+    db.removeChannel(
+      state.realtime
+    );
 
     state.realtime = null;
+
   }
 
-  if (!state.user) {
-    console.warn(
-      '⚠️ No hay usuario para conectar Realtime'
-    );
-
-    return;
-  }
 
   const channelName =
-    `hypefriends-sync-${state.user.id}-${Date.now()}`;
+    'hypefriends-sync-' +
+    state.user.id +
+    '-' +
+    Math.random()
+      .toString(36)
+      .slice(2);
 
-  console.log(
-    '📡 Creando canal Realtime:',
-    channelName
-  );
 
-  const channel = db.channel(channelName);
+  const channel =
+    db.channel(channelName);
 
-  /*
-   * PRODUCTOS
-   */
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'products'
-    },
-    async payload => {
+  const tables = [
 
-      console.log(
-        '🔄 REALTIME PRODUCTS:',
-        payload
-      );
+    'products',
 
-      await loadAll();
+    'customers',
 
-      render(state.view);
+    'sales',
 
-      setSync(
-        true,
-        'Producto actualizado en tiempo real'
-      );
-    }
-  );
+    'sale_items',
 
-  /*
-   * CLIENTES
-   */
+    'payments',
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'customers'
-    },
-    async payload => {
+    'expenses'
 
-      console.log(
-        '🔄 REALTIME CUSTOMERS:',
-        payload
-      );
+  ];
 
-      await loadAll();
 
-      render(state.view);
+  tables.forEach(table => {
 
-      setSync(
-        true,
-        'Cliente actualizado en tiempo real'
-      );
-    }
-  );
+    channel.on(
 
-  /*
-   * VENTAS
-   */
+      'postgres_changes',
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'sales'
-    },
-    async payload => {
+      {
 
-      console.log(
-        '🔄 REALTIME SALES:',
-        payload
-      );
+        event: '*',
 
-      await loadAll();
+        schema: 'public',
 
-      render(state.view);
+        table: table
 
-      setSync(
-        true,
-        'Venta actualizada en tiempo real'
-      );
-    }
-  );
+      },
 
-  /*
-   * DETALLES DE VENTA
-   */
-
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'sale_items'
-    },
-    async payload => {
-
-      console.log(
-        '🔄 REALTIME SALE_ITEMS:',
-        payload
-      );
-
-      await loadAll();
-
-      render(state.view);
-    }
-  );
-
-  /*
-   * PAGOS
-   */
-
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'payments'
-    },
-    async payload => {
-
-      console.log(
-        '🔄 REALTIME PAYMENTS:',
-        payload
-      );
-
-      await loadAll();
-
-      render(state.view);
-    }
-  );
-
-  /*
-   * GASTOS
-   */
-
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'expenses'
-    },
-    async payload => {
-
-      console.log(
-        '🔄 REALTIME EXPENSES:',
-        payload
-      );
-
-      await loadAll();
-
-      render(state.view);
-
-      setSync(
-        true,
-        'Gasto actualizado en tiempo real'
-      );
-    }
-  );
-
-  /*
-   * CONECTAR CANAL
-   */
-
-  state.realtime = channel.subscribe(
-    (status, error) => {
-
-      console.log(
-        '📡 SUPABASE REALTIME:',
-        status,
-        error || ''
-      );
-
-      if (status === 'SUBSCRIBED') {
+      payload => {
 
         console.log(
-          '✅ REALTIME CONECTADO CORRECTAMENTE'
+          '🔄 REALTIME:',
+          table,
+          payload
         );
 
-        setSync(
-          true,
-          '🟢 Supabase · Tiempo real conectado'
-        );
+
+        // No esperamos a que termine
+        // para evitar bloquear otros eventos.
+
+        loadAll()
+          .then(() => {
+
+            render(
+              state.view
+            );
+
+          });
+
       }
 
-      if (status === 'CHANNEL_ERROR') {
+    );
 
-        console.error(
-          '❌ REALTIME CHANNEL_ERROR:',
-          error
+  });
+
+
+  state.realtime =
+    channel.subscribe(
+      status => {
+
+        console.log(
+          '📡 SUPABASE REALTIME:',
+          status
         );
 
-        setSync(
-          false,
-          '🔴 Error Realtime'
-        );
+
+        if (
+          status === 'SUBSCRIBED'
+        ) {
+
+          setSync(
+            true,
+            'Tiempo real conectado'
+          );
+
+
+          console.log(
+            '✅ REALTIME CONECTADO'
+          );
+
+        }
+
+
+        if (
+          status ===
+          'CHANNEL_ERROR'
+        ) {
+
+          setSync(
+            false,
+            'Realtime con error'
+          );
+
+
+          console.error(
+            '❌ REALTIME ERROR'
+          );
+
+        }
+
+
+        if (
+          status ===
+          'TIMED_OUT'
+        ) {
+
+          setSync(
+            false,
+            'Realtime agotado'
+          );
+
+        }
+
+
+        if (
+          status === 'CLOSED'
+        ) {
+
+          setSync(
+            false,
+            'Realtime cerrado'
+          );
+
+        }
+
       }
+    );
 
-      if (status === 'TIMED_OUT') {
-
-        console.error(
-          '⏱️ REALTIME TIMED OUT'
-        );
-
-        setSync(
-          false,
-          '🟠 Reintentando Realtime...'
-        );
-      }
-
-      if (status === 'CLOSED') {
-
-        console.warn(
-          '🔴 REALTIME CLOSED'
-        );
-
-        setSync(
-          false,
-          '🔴 Realtime desconectado'
-        );
-      }
-    }
-  );
 }
 
-/* =========================================================
-   TOTALES
-   ========================================================= */
+
+// =========================================================
+// SINCRONIZACIÓN AUTOMÁTICA
+// =========================================================
+
+function startAutoSync() {
+
+  stopAutoSync();
+
+
+  console.log(
+    '🔁 Auto Sync iniciado'
+  );
+
+
+  state.syncTimer =
+    setInterval(
+      async () => {
+
+        if (
+          !state.user
+        ) {
+
+          return;
+
+        }
+
+
+        console.log(
+          '🔄 Auto Sync...'
+        );
+
+
+        await loadAll();
+
+
+        render(
+          state.view
+        );
+
+      },
+
+      3000
+
+    );
+
+}
+
+
+function stopAutoSync() {
+
+  if (
+    state.syncTimer
+  ) {
+
+    clearInterval(
+      state.syncTimer
+    );
+
+    state.syncTimer = null;
+
+  }
+
+}
+
+
+// =========================================================
+// TOTALES
+// =========================================================
 
 function totals(currency) {
 
   const sales =
     state.sales.filter(
-      sale => sale.currency === currency
+      s =>
+        s.currency ===
+        currency
     );
+
 
   const total =
     sales.reduce(
-      (sum, sale) =>
-        sum + Number(sale.total || 0),
+      (a, s) =>
+        a +
+        Number(
+          s.total || 0
+        ),
       0
     );
 
+
   const paid =
     sales.reduce(
-      (sum, sale) =>
-        sum + Number(sale.paid || 0),
+      (a, s) =>
+        a +
+        Number(
+          s.paid || 0
+        ),
       0
     );
+
 
   const expenses =
     state.expenses
       .filter(
-        expense =>
-          expense.currency === currency
+        e =>
+          e.currency ===
+          currency
       )
       .reduce(
-        (sum, expense) =>
-          sum + Number(expense.amount || 0),
+        (a, e) =>
+          a +
+          Number(
+            e.amount || 0
+          ),
         0
       );
 
+
   return {
+
     total,
+
     paid,
-    due: Math.max(total - paid, 0),
+
+    due:
+      Math.max(
+        total - paid,
+        0
+      ),
+
     expenses
+
   };
+
 }
 
-/* =========================================================
-   RENDER
-   ========================================================= */
 
-function render(view = 'dashboard') {
+// =========================================================
+// RENDER
+// =========================================================
+
+function render(
+  view = 'dashboard'
+) {
 
   state.view = view;
+
 
   document
     .querySelectorAll('.nav')
     .forEach(button => {
+
       button.classList.toggle(
         'active',
-        button.dataset.view === view
+        button.dataset.view ===
+        view
       );
+
     });
 
-  const titles = {
-    dashboard: 'DASHBOARD',
-    sales: 'VENTAS',
-    inventory: 'INVENTARIO',
-    finance: 'FINANZAS',
-    customers: 'CLIENTES',
-    history: 'HISTORIAL'
-  };
 
-  $('#viewTitle').textContent =
-    titles[view] || 'DASHBOARD';
+  if ($('#viewTitle')) {
 
-  const content = $('#content');
+    $('#viewTitle').textContent = {
+
+      dashboard:
+        'DASHBOARD',
+
+      sales:
+        'VENTAS',
+
+      inventory:
+        'INVENTARIO',
+
+      finance:
+        'FINANZAS',
+
+      customers:
+        'CLIENTES',
+
+      history:
+        'HISTORIAL'
+
+    }[view] ||
+      'DASHBOARD';
+
+  }
+
+
+  const content =
+    $('#content');
+
 
   if (!content) return;
 
-  if (view === 'dashboard') {
+
+  if (
+    view === 'dashboard'
+  ) {
+
     dashboard(content);
+
   }
 
-  if (view === 'sales') {
+
+  if (
+    view === 'sales'
+  ) {
+
     sales(content);
+
   }
 
-  if (view === 'inventory') {
+
+  if (
+    view === 'inventory'
+  ) {
+
     inventory(content);
+
   }
 
-  if (view === 'finance') {
+
+  if (
+    view === 'finance'
+  ) {
+
     finance(content);
+
   }
 
-  if (view === 'customers') {
+
+  if (
+    view === 'customers'
+  ) {
+
     customers(content);
+
   }
 
-  if (view === 'history') {
+
+  if (
+    view === 'history'
+  ) {
+
     history(content);
+
   }
+
 }
 
-/* =========================================================
-   DASHBOARD
-   ========================================================= */
+
+// =========================================================
+// DASHBOARD
+// =========================================================
 
 function dashboard(c) {
 
-  const crc = totals('CRC');
-  const usd = totals('USD');
+  const crc =
+    totals('CRC');
+
+  const usd =
+    totals('USD');
+
 
   const stock =
     state.products.reduce(
-      (sum, product) =>
-        sum + Number(product.stock || 0),
+      (a, p) =>
+        a +
+        Number(
+          p.stock || 0
+        ),
       0
     );
 
+
   c.innerHTML = `
+
     <div class="grid stats">
 
       <div class="card">
-        <div class="label">Ventas CRC</div>
+        <div class="label">
+          Ventas CRC
+        </div>
+
         <div class="metric">
-          ${money(crc.total, 'CRC')}
+          ${money(crc.total,'CRC')}
         </div>
       </div>
 
+
       <div class="card">
-        <div class="label">Cobrado CRC</div>
+
+        <div class="label">
+          Cobrado CRC
+        </div>
+
         <div class="metric orange">
-          ${money(crc.paid, 'CRC')}
+          ${money(crc.paid,'CRC')}
         </div>
+
       </div>
 
+
       <div class="card">
-        <div class="label">Ventas USD</div>
+
+        <div class="label">
+          Ventas USD
+        </div>
+
         <div class="metric">
-          ${money(usd.total, 'USD')}
+          ${money(usd.total,'USD')}
         </div>
+
       </div>
 
+
       <div class="card">
-        <div class="label">Stock total</div>
+
+        <div class="label">
+          Stock total
+        </div>
+
         <div class="metric">
           ${stock}
         </div>
+
       </div>
 
     </div>
+
 
     <div class="grid two">
 
       <div>
 
         <div class="section-title">
-          <h2>ÚLTIMAS VENTAS</h2>
+
+          <h2>
+            ÚLTIMAS VENTAS
+          </h2>
 
           <button
             class="primary small"
-            onclick="openSale()">
+            onclick="openSale()"
+          >
             + VENTA
           </button>
+
         </div>
 
         ${saleTable(5)}
 
       </div>
 
+
       <div>
 
         <div class="section-title">
-          <h2>RESUMEN</h2>
+
+          <h2>
+            RESUMEN
+          </h2>
+
         </div>
+
 
         <div class="grid">
 
           <div class="card">
+
             <div class="label">
               Por cobrar CRC
             </div>
 
             <div class="metric orange">
-              ${money(crc.due, 'CRC')}
+              ${money(crc.due,'CRC')}
             </div>
+
           </div>
 
+
           <div class="card">
+
             <div class="label">
               Por cobrar USD
             </div>
 
             <div class="metric orange">
-              ${money(usd.due, 'USD')}
+              ${money(usd.due,'USD')}
             </div>
+
           </div>
 
+
           <div class="card">
+
             <div class="label">
               Gastos CRC / USD
             </div>
 
             <div class="metric">
-              ${money(crc.expenses, 'CRC')}
+              ${money(crc.expenses,'CRC')}
               ·
-              ${money(usd.expenses, 'USD')}
+              ${money(usd.expenses,'USD')}
             </div>
+
           </div>
 
+
           <div class="card">
+
             <div class="label">
               Productos con stock bajo
             </div>
@@ -1138,10 +1552,12 @@ function dashboard(c) {
             <div class="metric">
               ${
                 state.products.filter(
-                  p => Number(p.stock) <= 3
+                  p =>
+                    Number(p.stock) <= 3
                 ).length
               }
             </div>
+
           </div>
 
         </div>
@@ -1149,12 +1565,15 @@ function dashboard(c) {
       </div>
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   TABLA VENTAS
-   ========================================================= */
+
+// =========================================================
+// TABLA VENTAS
+// =========================================================
 
 function saleTable(n = 99) {
 
@@ -1163,65 +1582,95 @@ function saleTable(n = 99) {
       .slice(-n)
       .reverse();
 
+
   return `
+
     <div class="table-wrap">
 
       <table>
 
         <thead>
+
           <tr>
-            <th>Cliente</th>
-            <th>Total</th>
-            <th>Pagado</th>
-            <th>Estado</th>
+
+            <th>
+              Cliente
+            </th>
+
+            <th>
+              Total
+            </th>
+
+            <th>
+              Pagado
+            </th>
+
+            <th>
+              Estado
+            </th>
+
             <th></th>
+
           </tr>
+
         </thead>
+
 
         <tbody>
 
           ${
-            rows
-              .map(sale => `
+            rows.map(
+              s => `
+
                 <tr>
 
                   <td>
+
                     <b>
-                      ${escapeHtml(sale.customer)}
+                      ${escapeHtml(
+                        s.customer
+                      )}
                     </b>
 
                     <br>
 
                     <span class="muted">
-                      ${escapeHtml(sale.id)}
+                      ${escapeHtml(
+                        s.id
+                      )}
                     </span>
+
                   </td>
+
 
                   <td>
                     ${money(
-                      sale.total,
-                      sale.currency
+                      s.total,
+                      s.currency
                     )}
                   </td>
 
+
                   <td>
                     ${money(
-                      sale.paid,
-                      sale.currency
+                      s.paid,
+                      s.currency
                     )}
                   </td>
+
 
                   <td>
 
                     <span
                       class="badge ${
-                        sale.paid >= sale.total
+                        s.paid >= s.total
                           ? 'green'
                           : 'orange'
-                      }">
+                      }"
+                    >
 
                       ${
-                        sale.paid >= sale.total
+                        s.paid >= s.total
                           ? 'Pagada'
                           : 'Pendiente'
                       }
@@ -1230,39 +1679,56 @@ function saleTable(n = 99) {
 
                   </td>
 
+
                   <td>
 
                     ${
-                      sale.paid < sale.total
+                      s.paid < s.total
+
                         ? `
+
                           <button
                             class="primary small"
-                            onclick="openPayment('${sale.id}')">
+                            onclick="openPayment('${s.id}')"
+                          >
                             ABONO
                           </button>
+
                         `
+
                         : ''
+
                     }
 
                   </td>
 
                 </tr>
-              `)
-              .join('')
+
+              `
+            ).join('')
           }
+
 
           ${
             !rows.length
+
               ? `
+
                 <tr>
+
                   <td
                     colspan="5"
-                    class="muted">
+                    class="muted"
+                  >
                     No hay ventas todavía.
                   </td>
+
                 </tr>
+
               `
+
               : ''
+
           }
 
         </tbody>
@@ -1270,188 +1736,274 @@ function saleTable(n = 99) {
       </table>
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   VENTAS
-   ========================================================= */
+
+// =========================================================
+// VENTAS
+// =========================================================
 
 function sales(c) {
 
   c.innerHTML = `
+
     <div class="section-title">
 
-      <h2>TODAS LAS VENTAS</h2>
+      <h2>
+        TODAS LAS VENTAS
+      </h2>
 
       <button
         class="primary"
-        onclick="openSale()">
+        onclick="openSale()"
+      >
         + NUEVA VENTA
       </button>
 
     </div>
 
     ${saleTable()}
+
   `;
+
 }
 
-/* =========================================================
-   INVENTARIO
-   ========================================================= */
+
+// =========================================================
+// INVENTARIO
+// =========================================================
 
 function inventory(c) {
 
   c.innerHTML = `
+
     <div class="section-title">
 
-      <h2>PRODUCTOS</h2>
+      <h2>
+        PRODUCTOS
+      </h2>
 
       <button
         class="primary"
-        onclick="openProduct()">
+        onclick="openProduct()"
+      >
         + PRODUCTO
       </button>
 
     </div>
 
+
     <div class="product-list">
 
       ${
-        state.products
-          .map(product => `
+        state.products.map(
+          p => `
+
             <div class="card product">
 
               <div class="label">
-                ${escapeHtml(product.category)}
+                ${escapeHtml(
+                  p.category
+                )}
               </div>
 
               <h3>
-                ${escapeHtml(product.name)}
+                ${escapeHtml(
+                  p.name
+                )}
               </h3>
 
               <div class="stock">
-                ${Number(product.stock)}
+
+                ${Number(
+                  p.stock
+                )}
+
                 <span class="muted">
                   unidades
                 </span>
+
               </div>
 
               <div class="muted">
+
                 Venta:
                 ${money(
-                  product.price,
-                  product.currency
+                  p.price,
+                  p.currency
                 )}
 
                 ·
 
                 Costo:
                 ${money(
-                  product.cost,
-                  product.currency
+                  p.cost,
+                  p.currency
                 )}
+
               </div>
 
               <div class="bar">
+
                 <span
                   style="
                     width:${Math.min(
-                      Number(product.stock) * 10,
+                      Number(p.stock) * 10,
                       100
                     )}%
-                  ">
-                </span>
+                  "
+                ></span>
+
               </div>
 
             </div>
-          `)
-          .join('')
+
+          `
+        ).join('')
       }
+
 
       ${
         !state.products.length
+
           ? `
+
             <div class="card muted">
               No hay productos.
             </div>
+
           `
+
           : ''
+
       }
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   FINANZAS
-   ========================================================= */
+
+// =========================================================
+// FINANZAS
+// =========================================================
 
 function finance(c) {
 
-  const crc = totals('CRC');
-  const usd = totals('USD');
+  const crc =
+    totals('CRC');
+
+  const usd =
+    totals('USD');
+
 
   c.innerHTML = `
+
     <div class="grid three">
 
       <div class="card">
+
         <div class="label">
           Ingresos CRC
         </div>
 
         <div class="metric">
-          ${money(crc.total)}
+          ${money(
+            crc.total,
+            'CRC'
+          )}
         </div>
+
       </div>
 
+
       <div class="card">
+
         <div class="label">
           Ingresos USD
         </div>
 
         <div class="metric">
-          ${money(usd.total, 'USD')}
+          ${money(
+            usd.total,
+            'USD'
+          )}
         </div>
+
       </div>
 
+
       <div class="card">
+
         <div class="label">
           Gastos CRC / USD
         </div>
 
         <div class="metric">
-          ${money(crc.expenses)}
+
+          ${money(
+            crc.expenses,
+            'CRC'
+          )}
+
           ·
-          ${money(usd.expenses, 'USD')}
+
+          ${money(
+            usd.expenses,
+            'USD'
+          )}
+
         </div>
+
       </div>
 
     </div>
 
+
     <div class="section-title">
 
-      <h2>GASTOS</h2>
+      <h2>
+        GASTOS
+      </h2>
 
       <button
         class="primary"
-        onclick="openExpense()">
+        onclick="openExpense()"
+      >
         + GASTO
       </button>
 
     </div>
+
 
     <div class="table-wrap">
 
       <table>
 
         <thead>
+
           <tr>
-            <th>Concepto</th>
-            <th>Monto</th>
-            <th>Fecha</th>
+
+            <th>
+              Concepto
+            </th>
+
+            <th>
+              Monto
+            </th>
+
+            <th>
+              Fecha
+            </th>
+
           </tr>
+
         </thead>
+
 
         <tbody>
 
@@ -1459,45 +2011,58 @@ function finance(c) {
             state.expenses
               .slice()
               .reverse()
-              .map(expense => `
-                <tr>
+              .map(
+                x => `
 
-                  <td>
-                    ${escapeHtml(
-                      expense.note
-                    )}
-                  </td>
+                  <tr>
 
-                  <td>
-                    ${money(
-                      expense.amount,
-                      expense.currency
-                    )}
-                  </td>
+                    <td>
+                      ${escapeHtml(
+                        x.note
+                      )}
+                    </td>
 
-                  <td>
-                    ${String(
-                      expense.created_at || ''
-                    ).slice(0, 10)}
-                  </td>
+                    <td>
+                      ${money(
+                        x.amount,
+                        x.currency
+                      )}
+                    </td>
 
-                </tr>
-              `)
+                    <td>
+                      ${String(
+                        x.created_at || ''
+                      ).slice(0,10)}
+                    </td>
+
+                  </tr>
+
+                `
+              )
               .join('')
           }
 
+
           ${
             !state.expenses.length
+
               ? `
+
                 <tr>
+
                   <td
                     colspan="3"
-                    class="muted">
+                    class="muted"
+                  >
                     No hay gastos.
                   </td>
+
                 </tr>
+
               `
+
               : ''
+
           }
 
         </tbody>
@@ -1505,194 +2070,283 @@ function finance(c) {
       </table>
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   CLIENTES
-   ========================================================= */
+
+// =========================================================
+// CLIENTES
+// =========================================================
 
 function customers(c) {
 
   c.innerHTML = `
+
     <div class="section-title">
 
-      <h2>CLIENTES</h2>
+      <h2>
+        CLIENTES
+      </h2>
 
       <button
         class="primary"
-        onclick="openCustomer()">
+        onclick="openCustomer()"
+      >
         + CLIENTE
       </button>
 
     </div>
 
+
     <div class="product-list">
 
       ${
-        state.customers
-          .map(customer => `
+        state.customers.map(
+          x => `
+
             <div class="card">
 
               <h3>
-                ${escapeHtml(customer.name)}
+                ${escapeHtml(
+                  x.name
+                )}
               </h3>
 
               <div class="muted">
                 ${escapeHtml(
-                  customer.phone ||
+                  x.phone ||
                   'Sin teléfono'
                 )}
               </div>
 
               ${
-                customer.email
+                x.email
+
                   ? `
+
                     <div class="muted">
                       ${escapeHtml(
-                        customer.email
+                        x.email
                       )}
                     </div>
+
                   `
+
                   : ''
+
               }
 
             </div>
-          `)
-          .join('')
+
+          `
+        ).join('')
       }
+
 
       ${
         !state.customers.length
+
           ? `
+
             <div class="card muted">
               Agrega tu primer cliente.
             </div>
+
           `
+
           : ''
+
       }
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   HISTORIAL
-   ========================================================= */
+
+// =========================================================
+// HISTORIAL
+// =========================================================
 
 function history(c) {
 
   const rows = [];
 
-  state.sales.forEach(sale => {
 
-    sale.payments.forEach(payment => {
+  state.sales.forEach(
+    sale => {
 
-      rows.push({
-        type: 'Pago',
-        desc:
-          `${sale.customer} · ${sale.id}`,
-        amount: payment.amount,
-        currency:
-          payment.currency ||
-          sale.currency,
-        date:
-          String(
-            payment.created_at || ''
-          ).slice(0, 10)
-      });
+      sale.payments.forEach(
+        payment => {
 
-    });
+          rows.push({
 
-  });
+            type: 'Pago',
 
-  state.expenses.forEach(expense => {
+            desc:
+              `${sale.customer} · ${sale.id}`,
 
-    rows.push({
-      type: 'Gasto',
-      desc: expense.note,
-      amount: expense.amount,
-      currency: expense.currency,
-      date:
-        String(
-          expense.created_at || ''
-        ).slice(0, 10)
-    });
+            amount:
+              payment.amount,
 
-  });
+            currency:
+              payment.currency ||
+              sale.currency,
 
-  rows.sort(
-    (a, b) =>
-      b.date.localeCompare(a.date)
+            date:
+              String(
+                payment.created_at ||
+                ''
+              ).slice(0,10)
+
+          });
+
+        }
+      );
+
+    }
   );
 
+
+  state.expenses.forEach(
+    expense => {
+
+      rows.push({
+
+        type: 'Gasto',
+
+        desc:
+          expense.note,
+
+        amount:
+          expense.amount,
+
+        currency:
+          expense.currency,
+
+        date:
+          String(
+            expense.created_at ||
+            ''
+          ).slice(0,10)
+
+      });
+
+    }
+  );
+
+
+  rows.sort(
+    (a,b) =>
+      b.date.localeCompare(
+        a.date
+      )
+  );
+
+
   c.innerHTML = `
+
     <div class="section-title">
 
-      <h2>MOVIMIENTOS</h2>
+      <h2>
+        MOVIMIENTOS
+      </h2>
 
     </div>
+
 
     <div class="table-wrap">
 
       <table>
 
         <thead>
+
           <tr>
-            <th>Tipo</th>
-            <th>Detalle</th>
-            <th>Monto</th>
-            <th>Fecha</th>
+
+            <th>
+              Tipo
+            </th>
+
+            <th>
+              Detalle
+            </th>
+
+            <th>
+              Monto
+            </th>
+
+            <th>
+              Fecha
+            </th>
+
           </tr>
+
         </thead>
+
 
         <tbody>
 
           ${
-            rows
-              .map(row => `
+            rows.map(
+              r => `
+
                 <tr>
 
                   <td>
+
                     <span class="badge">
-                      ${row.type}
+                      ${r.type}
                     </span>
+
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      row.desc
+                      r.desc
                     )}
                   </td>
 
                   <td>
                     ${money(
-                      row.amount,
-                      row.currency
+                      r.amount,
+                      r.currency
                     )}
                   </td>
 
                   <td>
-                    ${row.date}
+                    ${r.date}
                   </td>
 
                 </tr>
-              `)
-              .join('')
+
+              `
+            ).join('')
           }
+
 
           ${
             !rows.length
+
               ? `
+
                 <tr>
+
                   <td
                     colspan="4"
-                    class="muted">
+                    class="muted"
+                  >
                     No hay movimientos.
                   </td>
+
                 </tr>
+
               `
+
               : ''
+
           }
 
         </tbody>
@@ -1700,43 +2354,81 @@ function history(c) {
       </table>
 
     </div>
+
   `;
+
 }
 
-/* =========================================================
-   MODAL
-   ========================================================= */
+
+// =========================================================
+// MODAL
+// =========================================================
 
 function modal(html) {
 
-  $('#modalContent').innerHTML = html;
+  const content =
+    $('#modalContent');
 
-  $('#modal').classList.remove('hidden');
+  const modalElement =
+    $('#modal');
+
+
+  if (!content ||
+      !modalElement) {
+
+    return;
+
+  }
+
+
+  content.innerHTML =
+    html;
+
+
+  modalElement.classList.remove(
+    'hidden'
+  );
+
 }
+
 
 function closeModal() {
 
-  $('#modal').classList.add('hidden');
+  $('#modal')?.classList.add(
+    'hidden'
+  );
+
 }
 
-/* =========================================================
-   NUEVA VENTA
-   ========================================================= */
+
+// =========================================================
+// NUEVA VENTA
+// =========================================================
 
 function openSale() {
 
-  if (!state.products.length) {
+  if (
+    !state.products.length
+  ) {
+
     return toast(
       'Primero agrega un producto'
     );
+
   }
 
+
   modal(`
-    <h2>NUEVA VENTA</h2>
+
+    <h2>
+      NUEVA VENTA
+    </h2>
+
 
     <div class="form">
 
       <label>
+
         Cliente
 
         <select id="fCustomer">
@@ -1746,80 +2438,91 @@ function openSale() {
           </option>
 
           ${
-            state.customers
-              .map(customer => `
+            state.customers.map(
+              c => `
+
                 <option
-                  value="${customer.id}">
+                  value="${c.id}"
+                >
                   ${escapeHtml(
-                    customer.name
+                    c.name
                   )}
                 </option>
-              `)
-              .join('')
+
+              `
+            ).join('')
           }
 
         </select>
 
       </label>
 
+
       <label>
+
         Producto
 
         <select id="fProduct">
 
           ${
-            state.products
-              .map(product => `
+            state.products.map(
+              p => `
+
                 <option
-                  value="${product.id}">
-
+                  value="${p.id}"
+                >
                   ${escapeHtml(
-                    product.name
+                    p.name
                   )}
-
                   —
-
                   ${money(
-                    product.price,
-                    product.currency
+                    p.price,
+                    p.currency
                   )}
-
                   —
-
-                  stock ${product.stock}
-
+                  stock ${p.stock}
                 </option>
-              `)
-              .join('')
+
+              `
+            ).join('')
           }
 
         </select>
 
       </label>
 
+
       <div class="form-grid">
 
         <label>
+
           Cantidad
 
           <input
             id="fQty"
             type="number"
             min="1"
-            value="1">
+            value="1"
+          >
+
         </label>
 
+
         <label>
+
           Pago recibido
 
           <input
             id="fPaid"
             type="number"
             min="0"
-            value="0">
+            value="0"
+          >
+
         </label>
 
       </div>
+
 
       <div class="total-box">
 
@@ -1833,140 +2536,202 @@ function openSale() {
 
       </div>
 
+
       <button
         class="primary"
-        onclick="createSale()">
+        onclick="createSale()"
+      >
         REGISTRAR VENTA
       </button>
 
     </div>
+
   `);
 
-  ['fProduct', 'fQty'].forEach(id => {
 
-    const element = $('#' + id);
+  [
+    'fProduct',
+    'fQty'
+  ].forEach(
+    id => {
 
-    if (element) {
-      element.addEventListener(
-        'input',
-        updateSaleTotal
-      );
+      $('#' + id)
+        ?.addEventListener(
+          'input',
+          updateSaleTotal
+        );
+
     }
+  );
 
-  });
 
   updateSaleTotal();
+
 }
 
-/* =========================================================
-   TOTAL VENTA
-   ========================================================= */
+
+// =========================================================
+// TOTAL VENTA
+// =========================================================
 
 function updateSaleTotal() {
 
   const product =
     state.products.find(
-      item =>
-        item.id ===
+      x =>
+        x.id ===
         $('#fProduct')?.value
     );
 
+
   if (!product) return;
+
 
   const quantity =
     Number(
-      $('#fQty')?.value || 1
+      $('#fQty')?.value ||
+      1
     );
 
-  $('#saleTotal').textContent =
-    money(
-      Number(product.price) *
+
+  if ($('#saleTotal')) {
+
+    $('#saleTotal').textContent =
+      money(
+        Number(product.price) *
         quantity,
-      product.currency
-    );
+        product.currency
+      );
 
-  $('#saleCurrencyHint').textContent =
-    `Moneda de la venta: ${
-      product.currency === 'USD'
-        ? 'Dólares'
-        : 'Colones'
-    }`;
+  }
+
+
+  if ($('#saleCurrencyHint')) {
+
+    $('#saleCurrencyHint')
+      .textContent =
+      `Moneda de la venta: ${
+        product.currency === 'USD'
+          ? 'Dólares'
+          : 'Colones'
+      }`;
+
+  }
+
 }
 
-/* =========================================================
-   CREAR VENTA
-   ========================================================= */
+
+// =========================================================
+// CREAR VENTA
+// =========================================================
 
 async function createSale() {
 
   const product =
     state.products.find(
-      item =>
-        item.id ===
+      x =>
+        x.id ===
         $('#fProduct').value
     );
 
+
   const quantity =
-    Number($('#fQty').value);
+    Number(
+      $('#fQty').value
+    );
+
 
   const paid =
     Number(
-      $('#fPaid').value || 0
+      $('#fPaid').value ||
+      0
     );
 
-  const customerId =
-    $('#fCustomer').value || null;
 
-  if (!product || quantity <= 0) {
+  const customerId =
+    $('#fCustomer').value ||
+    null;
+
+
+  if (
+    !product ||
+    quantity <= 0
+  ) {
+
     return toast(
       'Datos de venta inválidos'
     );
+
   }
+
 
   if (
     quantity >
     Number(product.stock)
   ) {
+
     return toast(
       'No hay suficiente stock'
     );
+
   }
+
 
   const total =
     Number(product.price) *
     quantity;
 
+
   const realPaid =
     Math.min(
-      Math.max(paid, 0),
+      Math.max(
+        paid,
+        0
+      ),
       total
     );
+
 
   const status =
     realPaid >= total
       ? 'paid'
       : 'pending';
 
+
   setSync(
     true,
     'Guardando venta...'
   );
 
+
   const {
     data: sale,
     error: saleError
-  } = await db
-    .from('sales')
-    .insert({
-      customer_id: customerId,
-      total,
-      paid: realPaid,
-      currency: product.currency,
-      status,
-      created_by: state.user.id
-    })
-    .select()
-    .single();
+  } =
+    await db
+      .from('sales')
+      .insert({
+
+        customer_id:
+          customerId,
+
+        total,
+
+        paid:
+          realPaid,
+
+        currency:
+          product.currency,
+
+        status,
+
+        created_by:
+          state.user.id
+
+      })
+      .select()
+      .single();
+
 
   if (saleError) {
 
@@ -1974,70 +2739,102 @@ async function createSale() {
       saleError
     );
 
-    setSync(
-      false,
-      'Error guardando'
-    );
-
     return toast(
       'No se pudo registrar la venta'
     );
+
   }
+
 
   const {
     error: itemError
-  } = await db
-    .from('sale_items')
-    .insert({
-      sale_id: sale.id,
-      product_id: product.id,
-      quantity,
-      unit_price: product.price,
-      unit_cost: product.cost
-    });
+  } =
+    await db
+      .from('sale_items')
+      .insert({
+
+        sale_id:
+          sale.id,
+
+        product_id:
+          product.id,
+
+        quantity,
+
+        unit_price:
+          product.price,
+
+        unit_cost:
+          product.cost
+
+      });
+
 
   if (itemError) {
+
     console.error(
       itemError
     );
 
-    toast(
-      'Venta creada, pero falló el detalle'
-    );
   }
+
 
   if (realPaid > 0) {
 
     const {
       error: paymentError
-    } = await db
-      .from('payments')
-      .insert({
-        sale_id: sale.id,
-        amount: realPaid,
-        currency: product.currency,
-        created_by: state.user.id
-      });
+    } =
+      await db
+        .from('payments')
+        .insert({
+
+          sale_id:
+            sale.id,
+
+          amount:
+            realPaid,
+
+          currency:
+            product.currency,
+
+          created_by:
+            state.user.id
+
+        });
+
 
     if (paymentError) {
+
       console.error(
         paymentError
       );
+
     }
+
   }
+
 
   const {
     error: stockError
-  } = await db
-    .from('products')
-    .update({
-      stock:
-        Number(product.stock) -
-        quantity,
-      updated_at:
-        new Date().toISOString()
-    })
-    .eq('id', product.id);
+  } =
+    await db
+      .from('products')
+      .update({
+
+        stock:
+          Number(
+            product.stock
+          ) - quantity,
+
+        updated_at:
+          new Date().toISOString()
+
+      })
+      .eq(
+        'id',
+        product.id
+      );
+
 
   if (stockError) {
 
@@ -2045,10 +2842,8 @@ async function createSale() {
       stockError
     );
 
-    toast(
-      'Venta creada, pero no se pudo actualizar stock'
-    );
   }
+
 
   await loadAll();
 
@@ -2059,27 +2854,39 @@ async function createSale() {
   toast(
     'VENTA REGISTRADA EN LA NUBE'
   );
+
 }
 
-/* =========================================================
-   ABONO
-   ========================================================= */
+
+// =========================================================
+// ABONO
+// =========================================================
 
 function openPayment(id) {
 
   const sale =
     state.sales.find(
-      item => item.id === id
+      x => x.id === id
     );
+
 
   if (!sale) return;
 
+
+  const due =
+    Number(sale.total) -
+    Number(sale.paid);
+
+
   modal(`
+
     <h2>
       REGISTRAR ABONO
     </h2>
 
+
     <p>
+
       <b>
         ${escapeHtml(
           sale.customer
@@ -2088,8 +2895,12 @@ function openPayment(id) {
 
       ·
 
-      ${escapeHtml(sale.id)}
+      ${escapeHtml(
+        sale.id
+      )}
+
     </p>
+
 
     <div class="card">
 
@@ -2100,8 +2911,7 @@ function openPayment(id) {
       <div class="metric orange">
 
         ${money(
-          Number(sale.total) -
-            Number(sale.paid),
+          due,
           sale.currency
         )}
 
@@ -2109,77 +2919,97 @@ function openPayment(id) {
 
     </div>
 
+
     <div class="form">
 
       <label>
+
         Monto del abono
 
         <input
           id="payAmount"
           type="number"
           min="0.01"
-          max="${
-            Number(sale.total) -
-            Number(sale.paid)
-          }"
-          step="0.01">
+          max="${due}"
+          step="0.01"
+        >
 
       </label>
 
+
       <button
         class="primary"
-        onclick="addPayment('${sale.id}')">
-
-        REGISTRAR ABONO Y COMPROBANTE
-
+        onclick="addPayment('${sale.id}')"
+      >
+        REGISTRAR ABONO
       </button>
 
     </div>
+
   `);
+
 }
 
-/* =========================================================
-   AGREGAR ABONO
-   ========================================================= */
+
+// =========================================================
+// AGREGAR ABONO
+// =========================================================
 
 async function addPayment(id) {
 
   const sale =
     state.sales.find(
-      item => item.id === id
+      x => x.id === id
     );
+
 
   const amount =
     Number(
       $('#payAmount').value
     );
 
+
   if (!sale) return;
+
 
   const due =
     Number(sale.total) -
     Number(sale.paid);
+
 
   if (
     !amount ||
     amount <= 0 ||
     amount > due
   ) {
+
     return toast(
       'Monto de abono inválido'
     );
+
   }
+
 
   const {
     error: paymentError
-  } = await db
-    .from('payments')
-    .insert({
-      sale_id: id,
-      amount,
-      currency: sale.currency,
-      created_by: state.user.id
-    });
+  } =
+    await db
+      .from('payments')
+      .insert({
+
+        sale_id:
+          id,
+
+        amount,
+
+        currency:
+          sale.currency,
+
+        created_by:
+          state.user.id
+
+      });
+
 
   if (paymentError) {
 
@@ -2190,25 +3020,37 @@ async function addPayment(id) {
     return toast(
       'No se pudo registrar el abono'
     );
+
   }
+
 
   const newPaid =
     Number(sale.paid) +
     amount;
 
+
   const {
     error: saleError
-  } = await db
-    .from('sales')
-    .update({
-      paid: newPaid,
-      status:
-        newPaid >=
-        Number(sale.total)
-          ? 'paid'
-          : 'pending'
-    })
-    .eq('id', id);
+  } =
+    await db
+      .from('sales')
+      .update({
+
+        paid:
+          newPaid,
+
+        status:
+          newPaid >=
+          Number(sale.total)
+            ? 'paid'
+            : 'pending'
+
+      })
+      .eq(
+        'id',
+        id
+      );
+
 
   if (saleError) {
 
@@ -2217,63 +3059,56 @@ async function addPayment(id) {
     );
 
     return toast(
-      'Abono creado, pero no se actualizó la venta'
+      'Abono creado, pero venta no actualizada'
     );
+
   }
+
 
   await loadAll();
 
+
   const updated =
     state.sales.find(
-      item => item.id === id
+      x => x.id === id
     );
+
 
   showReceipt(
     updated,
     amount
   );
 
+
   render('sales');
+
 }
 
-/* =========================================================
-   COMPROBANTE
-   ========================================================= */
+
+// =========================================================
+// COMPROBANTE
+// =========================================================
 
 function receiptText(
   sale,
   amount
 ) {
 
-  return `
-HYPEFRIENDS BUSINESS
+  return `HYPEFRIENDS BUSINESS
 COMPROBANTE DE PAGO
 
 Cliente: ${sale.customer}
 Venta: ${sale.id}
-Pago recibido: ${money(
-    amount,
-    sale.currency
-  )}
-Total compra: ${money(
-    sale.total,
-    sale.currency
-  )}
-Total abonado: ${money(
-    sale.paid,
-    sale.currency
-  )}
-Saldo pendiente: ${money(
-    Number(sale.total) -
-      Number(sale.paid),
-    sale.currency
-  )}
+Pago recibido: ${money(amount,sale.currency)}
+Total compra: ${money(sale.total,sale.currency)}
+Total abonado: ${money(sale.paid,sale.currency)}
+Saldo pendiente: ${money(Number(sale.total)-Number(sale.paid),sale.currency)}
 
 SIN INTERESES
+Gracias por comprar en HYPEFRIENDS.`;
 
-Gracias por comprar en HYPEFRIENDS.
-`;
 }
+
 
 function showReceipt(
   sale,
@@ -2281,73 +3116,64 @@ function showReceipt(
 ) {
 
   modal(`
+
     <div
       class="receipt"
-      id="receiptPreview">
+      id="receiptPreview"
+    >
 
       <div class="receipt-head">
         HYPEFRIENDS
       </div>
 
       <div class="muted">
-        STREETWEAR & DROPS
-        ·
-        COMPROBANTE DE PAGO
+        STREETWEAR & DROPS · COMPROBANTE DE PAGO
       </div>
 
       <hr>
 
       <div class="receipt-row">
         <span>Cliente</span>
-        <b>
-          ${escapeHtml(
-            sale.customer
-          )}
-        </b>
+        <b>${escapeHtml(
+          sale.customer
+        )}</b>
       </div>
 
       <div class="receipt-row">
         <span>Venta</span>
-        <b>
-          ${escapeHtml(
-            sale.id
-          )}
-        </b>
+        <b>${escapeHtml(
+          sale.id
+        )}</b>
       </div>
 
       <div class="receipt-row">
         <span>Pago recibido</span>
-        <b>
-          ${money(
-            amount,
-            sale.currency
-          )}
-        </b>
+        <b>${money(
+          amount,
+          sale.currency
+        )}</b>
       </div>
 
       <div class="receipt-row">
         <span>Total compra</span>
-        <b>
-          ${money(
-            sale.total,
-            sale.currency
-          )}
-        </b>
+        <b>${money(
+          sale.total,
+          sale.currency
+        )}</b>
       </div>
 
       <div class="receipt-row">
         <span>Total abonado</span>
-        <b>
-          ${money(
-            sale.paid,
-            sale.currency
-          )}
-        </b>
+        <b>${money(
+          sale.paid,
+          sale.currency
+        )}</b>
       </div>
 
       <hr>
 
       <div class="receipt-row">
+
         <span>
           Saldo pendiente
         </span>
@@ -2355,15 +3181,18 @@ function showReceipt(
         <b class="receipt-total">
           ${money(
             Number(sale.total) -
-              Number(sale.paid),
+            Number(sale.paid),
             sale.currency
           )}
         </b>
+
       </div>
 
       <hr>
 
-      <b>SIN INTERESES</b>
+      <b>
+        SIN INTERESES
+      </b>
 
       <p class="muted">
         Gracias por comprar en HYPEFRIENDS.
@@ -2371,432 +3200,90 @@ function showReceipt(
 
     </div>
 
+
     <div
       class="actions"
-      style="margin-top:14px">
-
-      <button
-        class="primary"
-        onclick="shareReceiptImage(
-          '${sale.id}',
-          ${Number(amount)}
-        )">
-
-        📲 COMPARTIR IMAGEN
-
-      </button>
+      style="margin-top:14px"
+    >
 
       <button
         class="outline light-button"
-        onclick="shareReceiptText(
-          '${sale.id}',
-          ${Number(amount)}
-        )">
-
+        onclick="shareReceiptText('${sale.id}',${Number(amount)})"
+      >
         WHATSAPP / TEXTO
-
       </button>
 
       <button
         class="outline light-button"
-        onclick="closeModal()">
-
+        onclick="closeModal()"
+      >
         CERRAR
-
       </button>
 
     </div>
+
   `);
+
 }
 
-/* =========================================================
-   CANVAS COMPROBANTE
-   ========================================================= */
 
-function buildReceiptCanvas(
-  sale,
-  amount
-) {
-
-  const canvas =
-    document.createElement('canvas');
-
-  canvas.width = 900;
-  canvas.height = 1120;
-
-  const ctx =
-    canvas.getContext('2d');
-
-  ctx.fillStyle = '#ffffff';
-
-  ctx.fillRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-  ctx.fillStyle = '#090909';
-
-  ctx.textAlign = 'left';
-
-  ctx.font =
-    '900 48px Arial';
-
-  ctx.fillText(
-    'HYPEFRIENDS',
-    60,
-    90
-  );
-
-  ctx.font =
-    '700 22px Arial';
-
-  ctx.fillText(
-    'BUSINESS · COMPROBANTE DE PAGO',
-    60,
-    135
-  );
-
-  ctx.strokeStyle = '#cccccc';
-
-  ctx.setLineDash([
-    8,
-    8
-  ]);
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-    60,
-    175
-  );
-
-  ctx.lineTo(
-    840,
-    175
-  );
-
-  ctx.stroke();
-
-  ctx.setLineDash([]);
-
-  const rows = [
-    [
-      'Cliente',
-      sale.customer
-    ],
-    [
-      'Venta',
-      sale.id
-    ],
-    [
-      'Pago recibido',
-      money(
-        amount,
-        sale.currency
-      )
-    ],
-    [
-      'Total compra',
-      money(
-        sale.total,
-        sale.currency
-      )
-    ],
-    [
-      'Total abonado',
-      money(
-        sale.paid,
-        sale.currency
-      )
-    ],
-    [
-      'Saldo pendiente',
-      money(
-        Number(sale.total) -
-          Number(sale.paid),
-        sale.currency
-      )
-    ]
-  ];
-
-  let y = 240;
-
-  ctx.font =
-    '500 25px Arial';
-
-  rows.forEach(
-    ([label, value], index) => {
-
-      ctx.fillStyle =
-        '#777';
-
-      ctx.fillText(
-        label,
-        60,
-        y
-      );
-
-      ctx.fillStyle =
-        '#090909';
-
-      ctx.font =
-        index === 5
-          ? '900 38px Arial'
-          : '700 26px Arial';
-
-      ctx.fillText(
-        String(value),
-        600,
-        y
-      );
-
-      y += 95;
-
-      ctx.font =
-        '500 25px Arial';
-    }
-  );
-
-  ctx.strokeStyle =
-    '#cccccc';
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-    60,
-    y - 40
-  );
-
-  ctx.lineTo(
-    840,
-    y - 40
-  );
-
-  ctx.stroke();
-
-  ctx.font =
-    '900 28px Arial';
-
-  ctx.fillStyle =
-    '#090909';
-
-  ctx.fillText(
-    'SIN INTERESES',
-    60,
-    y + 25
-  );
-
-  ctx.font =
-    '500 21px Arial';
-
-  ctx.fillStyle =
-    '#777';
-
-  ctx.fillText(
-    'Gracias por comprar en HYPEFRIENDS.',
-    60,
-    y + 70
-  );
-
-  return canvas;
-}
-
-/* =========================================================
-   COMPARTIR IMAGEN
-   ========================================================= */
-
-async function shareReceiptImage(
-  id,
-  amount
-) {
-
-  const sale =
-    state.sales.find(
-      item => item.id === id
-    );
-
-  if (!sale) return;
-
-  const canvas =
-    buildReceiptCanvas(
-      sale,
-      amount
-    );
-
-  canvas.toBlob(
-    async blob => {
-
-      const file =
-        new File(
-          [
-            blob
-          ],
-          `HYPEFRIENDS-${id}.png`,
-          {
-            type: 'image/png'
-          }
-        );
-
-      if (
-        navigator.share &&
-        (
-          !navigator.canShare ||
-          navigator.canShare({
-            files: [file]
-          })
-        )
-      ) {
-
-        try {
-
-          await navigator.share({
-            title:
-              'Comprobante HYPEFRIENDS',
-
-            text:
-              receiptText(
-                sale,
-                amount
-              ),
-
-            files: [file]
-          });
-
-          toast(
-            'Comprobante listo para compartir'
-          );
-
-        } catch (error) {}
-
-      } else {
-
-        const a =
-          document.createElement('a');
-
-        a.href =
-          URL.createObjectURL(blob);
-
-        a.download =
-          `HYPEFRIENDS-${id}.png`;
-
-        a.click();
-
-        setTimeout(
-          () =>
-            URL.revokeObjectURL(
-              a.href
-            ),
-          1000
-        );
-
-        toast(
-          'Imagen generada'
-        );
-      }
-    },
-    'image/png'
-  );
-}
-
-/* =========================================================
-   COMPARTIR TEXTO
-   ========================================================= */
-
-async function shareReceiptText(
-  id,
-  amount
-) {
-
-  const sale =
-    state.sales.find(
-      item => item.id === id
-    );
-
-  if (!sale) return;
-
-  const text =
-    receiptText(
-      sale,
-      amount
-    );
-
-  if (navigator.share) {
-
-    try {
-
-      await navigator.share({
-        title:
-          'Comprobante HYPEFRIENDS',
-        text
-      });
-
-      return;
-
-    } catch (error) {}
-  }
-
-  try {
-
-    await navigator.clipboard.writeText(
-      text
-    );
-
-    toast(
-      'Comprobante copiado'
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    toast(
-      'No se pudo copiar'
-    );
-  }
-}
-
-/* =========================================================
-   NUEVO PRODUCTO
-   ========================================================= */
+// =========================================================
+// PRODUCTO
+// =========================================================
 
 function openProduct() {
 
   modal(`
-    <h2>NUEVO PRODUCTO</h2>
+
+    <h2>
+      NUEVO PRODUCTO
+    </h2>
+
 
     <div class="form">
 
       <label>
+
         Nombre
 
         <input
           id="pName"
-          required>
+          required
+        >
+
       </label>
+
 
       <div class="form-grid">
 
         <label>
+
           Categoría
 
           <input
             id="pCat"
-            value="General">
+            value="General"
+          >
+
         </label>
 
+
         <label>
+
           Stock
 
           <input
             id="pStock"
             type="number"
             value="1"
-            min="0">
+            min="0"
+          >
+
         </label>
 
+
         <label>
+
           Costo
 
           <input
@@ -2804,10 +3291,14 @@ function openProduct() {
             type="number"
             value="0"
             min="0"
-            step="0.01">
+            step="0.01"
+          >
+
         </label>
 
+
         <label>
+
           Precio
 
           <input
@@ -2815,12 +3306,16 @@ function openProduct() {
             type="number"
             value="0"
             min="0"
-            step="0.01">
+            step="0.01"
+          >
+
         </label>
 
       </div>
 
+
       <label>
+
         Moneda
 
         <select id="pCurrency">
@@ -2837,21 +3332,24 @@ function openProduct() {
 
       </label>
 
+
       <button
         class="primary"
-        onclick="createProduct()">
-
+        onclick="createProduct()"
+      >
         GUARDAR PRODUCTO
-
       </button>
 
     </div>
+
   `);
+
 }
 
-/* =========================================================
-   CREAR PRODUCTO
-   ========================================================= */
+
+// =========================================================
+// CREAR PRODUCTO
+// =========================================================
 
 async function createProduct() {
 
@@ -2867,62 +3365,64 @@ async function createProduct() {
 
     stock:
       Number(
-        $('#pStock').value || 0
+        $('#pStock').value ||
+        0
       ),
 
     cost:
       Number(
-        $('#pCost').value || 0
+        $('#pCost').value ||
+        0
       ),
 
     price:
       Number(
-        $('#pPrice').value || 0
+        $('#pPrice').value ||
+        0
       ),
 
     currency:
       $('#pCurrency').value
+
   };
 
-  setSync(
-    true,
-    'Guardando producto en Supabase...'
+
+  console.log(
+    'Guardando producto:',
+    row
   );
+
 
   const {
     data,
     error
-  } = await db
-    .from('products')
-    .insert(row)
-    .select()
-    .single();
+  } =
+    await db
+      .from('products')
+      .insert(row)
+      .select()
+      .single();
+
 
   if (error) {
 
     console.error(
-      '❌ Error creando producto:',
+      'ERROR PRODUCTO:',
       error
-    );
-
-    setSync(
-      false,
-      'Error guardando producto'
     );
 
     return toast(
       'No se pudo guardar el producto'
     );
+
   }
 
+
   console.log(
-    '✅ Producto creado:',
+    'Producto guardado:',
     data
   );
 
-  /*
-   * Cargamos inmediatamente desde Supabase.
-   */
 
   await loadAll();
 
@@ -2931,42 +3431,55 @@ async function createProduct() {
   render('inventory');
 
   toast(
-    'PRODUCTO GUARDADO EN SUPABASE'
+    'PRODUCTO GUARDADO EN LA NUBE'
   );
+
 }
 
-/* =========================================================
-   NUEVO GASTO
-   ========================================================= */
+
+// =========================================================
+// GASTOS
+// =========================================================
 
 function openExpense() {
 
   modal(`
+
     <h2>
       REGISTRAR GASTO
     </h2>
 
+
     <div class="form">
 
       <label>
+
         Concepto
 
         <input
           id="eNote"
-          placeholder="Compra de mercadería, envío...">
+          placeholder="Compra de mercadería, envío..."
+        >
+
       </label>
 
+
       <label>
+
         Monto
 
         <input
           id="eAmount"
           type="number"
           min="0"
-          step="0.01">
+          step="0.01"
+        >
+
       </label>
 
+
       <label>
+
         Moneda
 
         <select id="eCurrency">
@@ -2983,21 +3496,24 @@ function openExpense() {
 
       </label>
 
+
       <button
         class="primary"
-        onclick="createExpense()">
-
+        onclick="createExpense()"
+      >
         GUARDAR GASTO
-
       </button>
 
     </div>
+
   `);
+
 }
 
-/* =========================================================
-   CREAR GASTO
-   ========================================================= */
+
+// =========================================================
+// CREAR GASTO
+// =========================================================
 
 async function createExpense() {
 
@@ -3009,7 +3525,8 @@ async function createExpense() {
 
     amount:
       Number(
-        $('#eAmount').value || 0
+        $('#eAmount').value ||
+        0
       ),
 
     currency:
@@ -3017,28 +3534,41 @@ async function createExpense() {
 
     created_by:
       state.user.id
+
   };
 
-  if (row.amount <= 0) {
+
+  if (
+    row.amount <= 0
+  ) {
+
     return toast(
       'Monto inválido'
     );
+
   }
+
 
   const {
     error
-  } = await db
-    .from('expenses')
-    .insert(row);
+  } =
+    await db
+      .from('expenses')
+      .insert(row);
+
 
   if (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
 
     return toast(
       'No se pudo guardar el gasto'
     );
+
   }
+
 
   await loadAll();
 
@@ -3047,62 +3577,80 @@ async function createExpense() {
   render('finance');
 
   toast(
-    'GASTO REGISTRADO EN SUPABASE'
+    'GASTO REGISTRADO EN LA NUBE'
   );
+
 }
 
-/* =========================================================
-   NUEVO CLIENTE
-   ========================================================= */
+
+// =========================================================
+// CLIENTE
+// =========================================================
 
 function openCustomer() {
 
   modal(`
+
     <h2>
       NUEVO CLIENTE
     </h2>
 
+
     <div class="form">
 
       <label>
+
         Nombre
 
         <input
           id="cName"
-          required>
+          required
+        >
+
       </label>
 
+
       <label>
+
         Teléfono
 
         <input
           id="cPhone"
-          type="tel">
+          type="tel"
+        >
+
       </label>
 
+
       <label>
+
         Correo
 
         <input
           id="cEmail"
-          type="email">
+          type="email"
+        >
+
       </label>
+
 
       <button
         class="primary"
-        onclick="createCustomer()">
-
+        onclick="createCustomer()"
+      >
         GUARDAR CLIENTE
-
       </button>
 
     </div>
+
   `);
+
 }
 
-/* =========================================================
-   CREAR CLIENTE
-   ========================================================= */
+
+// =========================================================
+// CREAR CLIENTE
+// =========================================================
 
 async function createCustomer() {
 
@@ -3119,22 +3667,30 @@ async function createCustomer() {
     email:
       $('#cEmail').value.trim() ||
       null
+
   };
+
 
   const {
     error
-  } = await db
-    .from('customers')
-    .insert(row);
+  } =
+    await db
+      .from('customers')
+      .insert(row);
+
 
   if (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
 
     return toast(
       'No se pudo guardar el cliente'
     );
+
   }
+
 
   await loadAll();
 
@@ -3143,15 +3699,86 @@ async function createCustomer() {
   render('customers');
 
   toast(
-    'CLIENTE GUARDADO EN SUPABASE'
+    'CLIENTE GUARDADO EN LA NUBE'
   );
+
 }
 
-/* =========================================================
-   INSTALACIÓN PWA
-   ========================================================= */
 
-let deferredPrompt = null;
+// =========================================================
+// COMPARTIR TEXTO
+// =========================================================
+
+async function shareReceiptText(
+  id,
+  amount
+) {
+
+  const sale =
+    state.sales.find(
+      x => x.id === id
+    );
+
+
+  if (!sale) return;
+
+
+  const text =
+    receiptText(
+      sale,
+      amount
+    );
+
+
+  if (
+    navigator.share
+  ) {
+
+    try {
+
+      await navigator.share({
+
+        title:
+          'Comprobante HYPEFRIENDS',
+
+        text
+
+      });
+
+      return;
+
+    } catch (error) {}
+
+  }
+
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+    toast(
+      'Comprobante copiado'
+    );
+
+  } catch (error) {
+
+    toast(
+      'No se pudo copiar'
+    );
+
+  }
+
+}
+
+
+// =========================================================
+// INSTALACIÓN PWA
+// =========================================================
+
+let deferredPrompt;
+
 
 window.addEventListener(
   'beforeinstallprompt',
@@ -3159,13 +3786,18 @@ window.addEventListener(
 
     event.preventDefault();
 
-    deferredPrompt = event;
+    deferredPrompt =
+      event;
+
   }
 );
 
+
 async function installApp() {
 
-  if (deferredPrompt) {
+  if (
+    deferredPrompt
+  ) {
 
     deferredPrompt.prompt();
 
@@ -3176,11 +3808,15 @@ async function installApp() {
     toast(
       'En iPhone usa Compartir → Agregar a pantalla de inicio'
     );
+
   }
+
 }
 
-/* =========================================================
-   INICIAR
-   ========================================================= */
+
+// =========================================================
+// ARRANQUE
+// =========================================================
 
 boot();
+
