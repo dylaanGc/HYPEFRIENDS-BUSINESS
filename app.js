@@ -26,16 +26,10 @@ const state = {
   products: [],
   expenses: [],
   customers: [],
+  dataLoaded: false,
   view: 'dashboard',
   realtime: null
 };
-
-const DEFAULT_PRODUCTS = [
-  { name:'CORE HOODIE', category:'Hoodie', stock:5, cost:30000, price:48000, currency:'CRC' },
-  { name:'SHORT CORTEIZ', category:'Shorts', stock:8, cost:15000, price:25000, currency:'CRC' },
-  { name:'CAP CHROME HEARTS', category:'Gorra', stock:9, cost:9000, price:15000, currency:'CRC' },
-  { name:'CAMISETA CHROME HEARTS', category:'Camiseta', stock:15, cost:15000, price:28000, currency:'CRC' }
-];
 
 const money = (n, c='CRC') => c === 'USD'
   ? '$' + Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
@@ -150,9 +144,10 @@ async function startApp(session) {
   showLogin(false);
   setSync(true, 'Sincronizando nube...');
   await ensureProfile();
-  await loadAll();
+  const loaded = await loadAll();
   subscribeRealtime();
   render(state.view);
+  if (!loaded) return;
   setSync(true, 'Sincronizado con Supabase');
   if (convertedRows) toast(`${convertedRows} registros convertidos a colones (₡460 por US$1)`);
 }
@@ -193,6 +188,7 @@ function stopApp() {
   state.user = null;
   state.session = null;
   state.sales=[]; state.products=[]; state.expenses=[]; state.customers=[];
+  state.dataLoaded = false;
   showLogin(true);
 }
 
@@ -217,26 +213,21 @@ async function loadAll() {
   if (err) {
     setSync(false, 'Error de conexión');
     console.error(err);
-    toast('No se pudieron cargar los datos');
-    return;
+    toast(`No se pudieron cargar los datos: ${err.message || err}`);
+    return false;
   }
   state.products = p.data || [];
   state.customers = c.data || [];
   state.expenses = e.data || [];
+  state.dataLoaded = true;
   state.sales = (s.data || []).map(x => ({
     ...x,
     customer: x.customers?.name || 'Cliente',
     payments: (x.payments || []).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)))
   }));
 
-  if (!state.products.length) await seedProducts();
   setSync(true, 'Sincronizado con Supabase');
-}
-
-async function seedProducts() {
-  const { data, error } = await db.from('products').insert(DEFAULT_PRODUCTS).select();
-  if (!error) state.products = data || [];
-  else console.warn('Seed products:', error.message);
+  return true;
 }
 
 function subscribeRealtime() {
@@ -245,12 +236,13 @@ function subscribeRealtime() {
   let channel = db.channel('hypefriends-business-sync');
   tables.forEach(table => {
     channel = channel.on('postgres_changes', {event:'*', schema:'public', table}, async () => {
-      await loadAll();
-      render(state.view);
+      if (await loadAll()) render(state.view);
     });
   });
   state.realtime = channel.subscribe(status => {
-    if (status === 'SUBSCRIBED') setSync(true, 'Sincronizado en tiempo real');
+    if (status === 'SUBSCRIBED') {
+      setSync(state.dataLoaded, state.dataLoaded ? 'Sincronizado en tiempo real' : 'Conexión activa; datos pendientes');
+    }
     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setSync(false, 'Reintentando sincronización...');
   });
 }
@@ -527,7 +519,7 @@ async function createProduct(){
   const name=$('#pName').value.trim(), stock=Number($('#pStock').value), cost=Number($('#pCost').value), price=Number($('#pPrice').value);
   if(!name||![stock,cost,price].every(Number.isFinite)||stock<0||cost<0||price<0)return toast('Revisa el nombre, stock, costo y precio.');
   const row={name,size:$('#pSize').value.trim()||null,stock,cost,price,currency:'CRC'};
-  const {error}=await db.from('products').insert(row); if(error){console.error(error);return toast('No se pudo guardar el producto');}
+  const {error}=await db.from('products').insert(row); if(error){console.error(error);return toast(`No se pudo guardar el producto: ${error.message}`);}
   await loadAll();closeModal();render('inventory');toast('PRODUCTO GUARDADO EN LA NUBE');
 }
 
