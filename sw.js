@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hf-business-v11';
+const CACHE_NAME = 'hf-business-v12';
 const APP_FILES = [
   './',
   './index.html',

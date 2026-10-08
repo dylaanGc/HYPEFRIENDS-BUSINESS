@@ -287,7 +287,10 @@ function dashboard(c) {
     salesByDay.push({key,label:date.toLocaleDateString('es-CR',{day:'numeric',month:'short'}),total});
   }
   const maxDay=Math.max(...salesByDay.map(day=>day.total),1);
-  const bars=salesByDay.map(day=>`<div class="chart-item ${day.key===now?'today':''}" title="${escapeHtml(day.label)} · ${money(day.total)}"><div class="chart-bar" style="height:${Math.max(day.total?7:2,day.total/maxDay*100)}%"></div><span class="chart-label">${escapeHtml(day.label)}</span></div>`).join('');
+  const bars=salesByDay.map(day=>{
+    const height=day.total?Math.max(8,day.total/maxDay*78):3;
+    return `<div class="chart-item ${day.key===now?'today':''}" title="${escapeHtml(day.label)} · ${money(day.total)}"><div class="chart-bar" style="height:${height}px"></div><span class="chart-label">${escapeHtml(day.label)}</span></div>`;
+  }).join('');
   const pendingHtml=pending.slice().sort((a,b)=>Number(b.total)-Number(a.total)).slice(0,5).map(s=>`<div class="payment-row"><span>${escapeHtml(s.customer)}<br><small class="muted">${escapeHtml(s.id.slice(0,8))} · Abonado ${money(s.paid)}</small></span><span class="orange">${money(Number(s.total)-Number(s.paid))}</span></div>`).join('')||'<p class="muted">No hay apartados pendientes.</p>';
   const featuredProducts=state.products.slice(0,5).map(p=>`<div class="featured-product"><span class="featured-icon" aria-hidden="true">◇</span><span class="featured-info"><b>${escapeHtml(p.name)}</b><small>Talla: ${escapeHtml(p.size||'—')} · Stock: ${Number(p.stock)}</small></span><strong>${money(p.price,p.currency)}</strong></div>`).join('')||'<p class="muted">Agrega productos para verlos aquí.</p>';
   c.innerHTML=`
