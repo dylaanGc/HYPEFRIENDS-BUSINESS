@@ -35,11 +35,23 @@ const money = (n, c='CRC') => c === 'USD'
   ? '$' + Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
   : '₡' + Math.round(Number(n || 0)).toLocaleString('es-CR');
 
-const today = () => {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+const costaRicaDateKey = date => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone:'America/Costa_Rica',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part=>[part.type,part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 };
-const dateKey = value => String(value || '').slice(0,10);
+const today = () => costaRicaDateKey(new Date());
+const dateKey = value => {
+  const text = String(value || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : costaRicaDateKey(date);
+};
 const escapeHtml = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); };
 
@@ -281,10 +293,11 @@ function dashboard(c) {
   const pendingTotal=pending.reduce((sum,s)=>sum+Number(s.total||0)-Number(s.paid||0),0);
   const salesByDay=[];
   for(let offset=6;offset>=0;offset--){
-    const date=new Date(); date.setDate(date.getDate()-offset);
-    const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    const date=new Date(`${now}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate()-offset);
+    const key=date.toISOString().slice(0,10);
     const total=state.sales.filter(s=>s.currency==='CRC'&&dateKey(s.created_at)===key).reduce((sum,s)=>sum+Number(s.total||0),0);
-    salesByDay.push({key,label:date.toLocaleDateString('es-CR',{day:'numeric',month:'short'}),total});
+    salesByDay.push({key,label:date.toLocaleDateString('es-CR',{timeZone:'UTC',day:'numeric',month:'short'}),total});
   }
   const maxDay=Math.max(...salesByDay.map(day=>day.total),1);
   const bars=salesByDay.map(day=>{
