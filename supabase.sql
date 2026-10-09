@@ -26,6 +26,7 @@ create table if not exists public.products (
   updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists image_url text;
 alter table public.products add column if not exists cost_currency text;
 update public.products set cost_currency=currency where cost_currency is null;
 alter table public.products alter column cost_currency set default 'CRC';
@@ -41,6 +42,30 @@ begin
       add constraint products_cost_currency_check check (cost_currency in ('CRC','USD'));
   end if;
 end $$;
+
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+values ('product-images','product-images',true,5242880,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update
+set public=excluded.public,
+    file_size_limit=excluded.file_size_limit,
+    allowed_mime_types=excluded.allowed_mime_types;
+
+drop policy if exists "product images public read" on storage.objects;
+drop policy if exists "product images authenticated insert" on storage.objects;
+drop policy if exists "product images authenticated update" on storage.objects;
+
+create policy "product images public read" on storage.objects
+for select to anon, authenticated
+using (bucket_id='product-images');
+
+create policy "product images authenticated insert" on storage.objects
+for insert to authenticated
+with check (bucket_id='product-images');
+
+create policy "product images authenticated update" on storage.objects
+for update to authenticated
+using (bucket_id='product-images')
+with check (bucket_id='product-images');
 
 create table if not exists public.customers (
   id uuid primary key default gen_random_uuid(),

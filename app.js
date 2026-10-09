@@ -360,7 +360,7 @@ function saleTable(n=99) {
 function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos en colones o dólares, según la moneda elegida para cada venta.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
 
 function inventory(c){
-  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Sneakers, hoodies y artículos en bodega</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Talla</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span>${escapeHtml(p.name)}</span><button class="secondary small inventory-cost-edit" onclick="openProductCost('${p.id}')">EDITAR COSTO · ${p.cost_currency||p.currency||'CRC'}</button></td><td>${escapeHtml(p.size||'—')}</td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Sneakers, hoodies y artículos en bodega</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Talla</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span class="inventory-thumb">${p.image_url?`<img src="${escapeHtml(p.image_url)}" alt="Foto de ${escapeHtml(p.name)}" loading="lazy">`:'◇'}</span><span class="inventory-product-info"><span>${escapeHtml(p.name)}</span><button class="secondary small inventory-photo-edit" onclick="openProductPhoto('${p.id}')">${p.image_url?'CAMBIAR FOTO':'AGREGAR FOTO'}</button><button class="secondary small inventory-cost-edit" onclick="openProductCost('${p.id}')">EDITAR COSTO · ${p.cost_currency||p.currency||'CRC'}</button></span></td><td>${escapeHtml(p.size||'—')}</td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function finance(c){
@@ -567,6 +567,37 @@ function openProductCost(id){
   if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
   const currency=product.cost_currency||product.currency||'CRC';
   modal(`<h2>EDITAR COSTO UNITARIO</h2><p>${escapeHtml(product.name)} · Stock actual: <b>${Number(product.stock)}</b></p><div class="form"><label>Moneda del costo<select id="editCostCurrency"><option value="CRC" ${currency==='CRC'?'selected':''}>CRC · Colones</option><option value="USD" ${currency==='USD'?'selected':''}>USD · Dólares</option></select></label><label>Costo unitario<input id="editUnitCost" type="number" min="0" step="0.01" value="${Number(product.cost||0)}"></label><p class="muted">Solo se actualizarán el costo y su moneda. El stock y el precio de venta no cambiarán.</p><button class="primary" onclick="saveProductCost('${product.id}')">GUARDAR COSTO</button></div>`);
+}
+
+function openProductPhoto(id){
+  const product=state.products.find(row=>row.id===id);
+  if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
+  modal(`<h2>FOTO DEL PRODUCTO</h2><p>${escapeHtml(product.name)} · Stock actual: <b>${Number(product.stock)}</b></p><div class="form">${product.image_url?`<img class="product-photo-preview" src="${escapeHtml(product.image_url)}" alt="Foto actual de ${escapeHtml(product.name)}">`:'<div class="product-photo-empty">◇</div>'}<label>Seleccionar foto<input id="productPhotoFile" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="muted">Formatos JPG, PNG o WebP · máximo 5 MB. La foto no cambia el stock, el costo ni el precio.</p><button class="primary" onclick="saveProductPhoto('${product.id}')">GUARDAR FOTO</button></div>`);
+}
+
+async function saveProductPhoto(id){
+  const product=state.products.find(row=>row.id===id);
+  const file=$('#productPhotoFile')?.files?.[0];
+  if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
+  if(!file)return toast('Selecciona una foto para continuar.');
+  const allowedTypes=['image/jpeg','image/png','image/webp'];
+  if(!allowedTypes.includes(file.type))return toast('Elige una foto JPG, PNG o WebP.');
+  if(file.size>5*1024*1024)return toast('La foto supera el límite de 5 MB.');
+  const storagePath=`${product.id}/photo`;
+  const {error:uploadError}=await db.storage.from('product-images').upload(storagePath,file,{
+    cacheControl:'3600',
+    contentType:file.type,
+    upsert:true
+  });
+  if(uploadError){console.error('Product photo upload:',uploadError);return toast(`No se pudo subir la foto: ${uploadError.message}`);}
+  const {data:{publicUrl}}=db.storage.from('product-images').getPublicUrl(storagePath);
+  const imageUrl=`${publicUrl}?v=${Date.now()}`;
+  const {data,error}=await db.from('products').update({image_url:imageUrl,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
+  if(error||!data){
+    console.error('Product photo update:',error);
+    return toast(`La foto se subió, pero no se pudo guardar en el producto: ${error?.message||'no se encontró el registro'}`);
+  }
+  await loadAll();closeModal();render('inventory');toast('FOTO DEL PRODUCTO ACTUALIZADA; INVENTARIO SIN CAMBIOS');
 }
 
 async function saveProductCost(id){
