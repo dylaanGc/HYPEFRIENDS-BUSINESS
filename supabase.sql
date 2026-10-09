@@ -26,6 +26,22 @@ create table if not exists public.products (
   updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists cost_currency text;
+update public.products set cost_currency=currency where cost_currency is null;
+alter table public.products alter column cost_currency set default 'CRC';
+alter table public.products alter column cost_currency set not null;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid='public.products'::regclass and conname='products_cost_currency_check'
+  ) then
+    alter table public.products
+      add constraint products_cost_currency_check check (cost_currency in ('CRC','USD'));
+  end if;
+end $$;
+
 create table if not exists public.customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,

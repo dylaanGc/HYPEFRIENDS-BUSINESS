@@ -159,6 +159,9 @@ body{background:#090909}
 .overview-metrics .label{font-size:12px;letter-spacing:.4px;color:#aaa}
 .overview-metrics .metric{font-size:24px;margin-top:6px}
 .overview-metrics .metric-note{background:#332610;border:1px solid #5b4514;border-radius:9px;padding:8px 11px;color:#f3c438;font-size:12px}
+.inventory-cost-card .metric-left>div{min-width:0}
+.inventory-cost-currency-control{display:grid;gap:5px;justify-items:end;color:#888;font-size:9px}
+.inventory-cost-currency-control select{width:66px;padding:7px 8px;border-radius:9px;background:#101011;font-size:10px}
 .featured-inventory{margin:24px 0;padding:22px}
 .featured-inventory .section-title{margin:0 0 15px}
 .featured-inventory .section-title h2{text-transform:uppercase;letter-spacing:1px}
@@ -176,6 +179,8 @@ body{background:#090909}
 .inventory-table th{font-size:11px;padding:16px}
 .inventory-table td{padding:18px 16px;font-size:13px;white-space:normal}
 .inventory-name{font-weight:600;max-width:200px}
+.inventory-name>span{display:block}
+.inventory-cost-edit{margin-top:8px;white-space:nowrap;font-size:8px}
 .inventory-price{font-weight:700;color:#fff!important}
 .stock-badge{display:inline-block;background:#102c24;color:#36d0a1;padding:6px 9px;border-radius:9px;font-weight:700}
 .installment-list{display:grid;gap:16px}
@@ -198,11 +203,17 @@ body{background:#090909}
 .sales-overview .label{font-size:11px;color:#aaa;letter-spacing:.7px}
 .sales-overview-total{margin-top:8px;font-size:clamp(27px,5vw,38px);line-height:1.1;font-weight:800;letter-spacing:-1px}
 .sales-overview-total small{font-size:11px;color:#999;letter-spacing:0}
-.sales-period{padding:7px 10px;border:1px solid #3a2b22;border-radius:10px;color:#f5a06e;background:#2b1b13;font-size:10px;white-space:nowrap}
-.sales-overview-chart{height:104px;margin-top:18px;border-color:#3a3532}
-.sales-overview-chart .chart-bar{background:#67351f}
-.sales-overview-chart .chart-item.today .chart-bar{background:var(--orange)}
-.sales-chart-axis{display:flex;justify-content:space-between;margin-top:22px;color:#858589;font-size:10px}
+.sales-currency-control{display:grid;gap:6px;color:#aaa;font-size:10px}
+.sales-currency-control select{min-width:142px;padding:9px 11px;border-color:#3a2b22;border-radius:10px;background:#2b1b13;color:#f5a06e;font-size:11px;font-weight:700}
+.sales-overview-chart{width:100%;margin-top:18px;overflow:hidden}
+.sales-overview-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.sales-chart-gridline{stroke:#ffffff12;stroke-width:1}
+.sales-chart-tick,.sales-chart-date{fill:#89898e;font-family:Inter,Arial,sans-serif;font-size:10px}
+.sales-chart-date{text-anchor:middle}
+.sales-chart-area{fill:url(#salesChartGradient)}
+.sales-chart-line{fill:none;stroke:#ff7845;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.sales-chart-point{fill:#ff7845;stroke:#1a1716;stroke-width:2;vector-effect:non-scaling-stroke}
+.sales-chart-point.is-today{fill:#ffc092}
 .login-screen{background:radial-gradient(ellipse at 50% 0,#33180f 0,transparent 44%),#090909}
 .login-card{background:linear-gradient(145deg,#19191b,#111112);color:#f5f5f5;border:1px solid #2d2d30;border-radius:24px;padding:38px;box-shadow:0 28px 80px #0009}
 .login-brand{margin-bottom:30px}
@@ -245,7 +256,9 @@ body{background:#090909}
   .content-intro h2{font-size:24px;letter-spacing:-.5px}
   .content-intro p{font-size:14px;margin-top:5px}
   .sales-overview{padding:20px 18px;margin-bottom:16px}
-  .sales-overview-chart{height:100px}
+  .sales-overview-chart{margin-top:20px}
+  .sales-overview-chart svg{height:145px}
+  .sales-chart-tick,.sales-chart-date{font-size:22px}
   .overview-metrics{grid-template-columns:1fr;gap:14px;margin-top:26px}
   .overview-metrics .metric-card{min-height:104px;padding:18px 20px;border-radius:22px}
   .overview-metrics .metric-icon{width:58px;height:58px}

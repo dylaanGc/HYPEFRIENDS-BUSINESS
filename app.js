@@ -28,12 +28,20 @@ const state = {
   customers: [],
   dataLoaded: false,
   view: 'dashboard',
+  chartCurrency: localStorage.getItem('hf_dashboard_chart_currency') === 'USD' ? 'USD' : 'CRC',
+  inventoryCostCurrency: localStorage.getItem('hf_inventory_cost_currency') === 'USD' ? 'USD' : 'CRC',
   realtime: null
 };
 
 const money = (n, c='CRC') => c === 'USD'
   ? '$' + Number(n || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
   : '₡' + Math.round(Number(n || 0)).toLocaleString('es-CR');
+const convertCurrencyAmount = (amount, from, to) => {
+  const value=Number(amount||0);
+  if(from===to)return value;
+  return from==='USD'?value*USD_TO_CRC_RATE:value/USD_TO_CRC_RATE;
+};
+const currencyLabel = currency => currency==='USD'?'dólares':'colones';
 
 const costaRicaDateKey = date => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -143,15 +151,6 @@ async function logout() {
 async function startApp(session) {
   state.session = session;
   state.user = session.user;
-  let convertedRows = 0;
-  try {
-    convertedRows = await convertUsdToCrc();
-  } catch (error) {
-    console.error('Currency conversion failed:', error);
-    $('#loginError').textContent = `No se pudo completar la conversión a colones. ${error.message || error} Recarga para reintentar.`;
-    showLogin(true);
-    return;
-  }
   $('#userEmail').textContent = state.user.email || 'Usuario';
   showLogin(false);
   setSync(true, 'Sincronizando nube...');
@@ -161,37 +160,6 @@ async function startApp(session) {
   render(state.view);
   if (!loaded) return;
   setSync(true, 'Sincronizado con Supabase');
-  if (convertedRows) toast(`${convertedRows} registros convertidos a colones (₡460 por US$1)`);
-}
-
-async function convertUsdToCrc() {
-  const conversions = [
-    { table:'products', fields:['cost','price'] },
-    { table:'sales', fields:['total','paid'] },
-    { table:'payments', fields:['amount'] },
-    { table:'expenses', fields:['amount'] }
-  ];
-  let converted = 0;
-
-  for (const {table, fields} of conversions) {
-    while (true) {
-      const columns=['id',...fields].join(',');
-      const {data: rows, error: readError} = await db.from(table).select(columns).eq('currency','USD').range(0,199);
-      if (readError) throw new Error(`No se pudieron leer los importes en USD de ${table}: ${readError.message}`);
-      if (!rows?.length) break;
-
-      for (const row of rows) {
-        const values = {currency:'CRC'};
-        fields.forEach(field => { values[field] = Number(row[field] || 0) * USD_TO_CRC_RATE; });
-        if (table === 'products') values.updated_at = new Date().toISOString();
-        const {data, error} = await db.from(table).update(values).eq('id',row.id).eq('currency','USD').select('id');
-        if (error) throw new Error(`No se pudo convertir un registro de ${table}: ${error.message}`);
-        converted += data?.length || 0;
-      }
-    }
-  }
-
-  return converted;
 }
 
 function stopApp() {
@@ -260,11 +228,24 @@ function subscribeRealtime() {
 }
 
 function totals(currency) {
-  const sales = state.sales.filter(s=>s.currency===currency);
-  const total = sales.reduce((a,s)=>a+Number(s.total||0),0);
-  const paid = sales.reduce((a,s)=>a+Number(s.paid||0),0);
-  const expenses = state.expenses.filter(e=>e.currency===currency).reduce((a,e)=>a+Number(e.amount||0),0);
+  const total = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.total,s.currency||'CRC',currency),0);
+  const paid = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.paid,s.currency||'CRC',currency),0);
+  const expenses = state.expenses.reduce((sum,e)=>sum+convertCurrencyAmount(e.amount,e.currency||'CRC',currency),0);
   return {total, paid, due:Math.max(total-paid,0), expenses};
+}
+
+function setChartCurrency(currency){
+  if(currency!=='CRC'&&currency!=='USD')return;
+  state.chartCurrency=currency;
+  localStorage.setItem('hf_dashboard_chart_currency',currency);
+  render('dashboard');
+}
+
+function setInventoryCostCurrency(currency){
+  if(currency!=='CRC'&&currency!=='USD')return;
+  state.inventoryCostCurrency=currency;
+  localStorage.setItem('hf_inventory_cost_currency',currency);
+  render('dashboard');
 }
 
 function render(view='dashboard') {
@@ -283,39 +264,68 @@ function render(view='dashboard') {
 
 function dashboard(c) {
   const now=today();
-  const salesToday=state.sales.filter(s=>s.currency==='CRC'&&dateKey(s.created_at)===now);
-  const todayTotal=salesToday.reduce((sum,s)=>sum+Number(s.total||0),0);
+  const salesToday=state.sales.filter(s=>dateKey(s.created_at)===now);
+  const todayTotal=salesToday.reduce((sum,s)=>sum+convertCurrencyAmount(s.total,s.currency||'CRC','CRC'),0);
   const crc=totals('CRC');
-  const inventoryCost=state.products.reduce((sum,p)=>sum+Number(p.stock||0)*Number(p.cost||0),0);
-  const todayExpenses=state.expenses.filter(e=>e.currency==='CRC'&&dateKey(e.created_at)===now).reduce((sum,e)=>sum+Number(e.amount||0),0);
+  const inventoryCost=state.products.reduce((sum,p)=>sum+convertCurrencyAmount(Number(p.stock||0)*Number(p.cost||0),p.cost_currency||p.currency||'CRC',state.inventoryCostCurrency),0);
   const soldToday=salesToday.reduce((sum,s)=>sum+(s.sale_items||[]).reduce((n,item)=>n+Number(item.quantity||0),0),0);
-  const pending=state.sales.filter(s=>s.currency==='CRC'&&Number(s.paid)<Number(s.total));
-  const pendingTotal=pending.reduce((sum,s)=>sum+Number(s.total||0)-Number(s.paid||0),0);
+  const pending=state.sales.filter(s=>Number(s.paid)<Number(s.total));
+  const pendingTotal=pending.reduce((sum,s)=>sum+convertCurrencyAmount(Number(s.total||0)-Number(s.paid||0),s.currency||'CRC','CRC'),0);
   const salesByDay=[];
   for(let offset=6;offset>=0;offset--){
     const date=new Date(`${now}T12:00:00Z`);
     date.setUTCDate(date.getUTCDate()-offset);
     const key=date.toISOString().slice(0,10);
-    const total=state.sales.filter(s=>s.currency==='CRC'&&dateKey(s.created_at)===key).reduce((sum,s)=>sum+Number(s.total||0),0);
+    const total=state.sales.filter(s=>dateKey(s.created_at)===key).reduce((sum,s)=>sum+convertCurrencyAmount(s.total,s.currency||'CRC',state.chartCurrency),0);
     salesByDay.push({key,label:date.toLocaleDateString('es-CR',{timeZone:'UTC',day:'numeric',month:'short'}),total});
   }
-  const maxDay=Math.max(...salesByDay.map(day=>day.total),1);
-  const bars=salesByDay.map(day=>{
-    const height=day.total?Math.max(8,day.total/maxDay*78):3;
-    return `<div class="chart-item ${day.key===now?'today':''}" title="${escapeHtml(day.label)} · ${money(day.total)}"><div class="chart-bar" style="height:${height}px"></div><span class="chart-label">${escapeHtml(day.label)}</span></div>`;
+  const chartWidth=760;
+  const chartHeight=190;
+  const chartLeft=66;
+  const chartRight=750;
+  const chartTop=12;
+  const chartBottom=147;
+  const chartRange=Math.max(...salesByDay.map(day=>day.total),1);
+  const rawStep=chartRange/4;
+  const stepMagnitude=Math.max(1,10**Math.floor(Math.log10(rawStep)));
+  const stepSize=stepMagnitude*[1,2,5,10].find(step=>step*stepMagnitude>=rawStep);
+  const chartMax=stepSize*4;
+  const chartPoints=salesByDay.map((day,index)=>({
+    x:chartLeft+index*(chartRight-chartLeft)/(salesByDay.length-1),
+    y:chartBottom-day.total/chartMax*(chartBottom-chartTop),
+    day
+  }));
+  const linePath=chartPoints.map((point,index)=>`${index?'L':'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+  const areaPath=`${linePath} L${chartRight} ${chartBottom} L${chartLeft} ${chartBottom} Z`;
+  const chartGrid=Array.from({length:5},(_,index)=>{
+    const value=stepSize*(4-index);
+    const y=chartTop+index*(chartBottom-chartTop)/4;
+    const label=value>=1000000?`${state.chartCurrency==='USD'?'$':'₡'}${(value/1000000).toLocaleString(state.chartCurrency==='USD'?'en-US':'es-CR',{maximumFractionDigits:1})} mill.`:value>=1000?`${state.chartCurrency==='USD'?'$':'₡'}${Math.round(value/1000).toLocaleString(state.chartCurrency==='USD'?'en-US':'es-CR')} mil`:money(value,state.chartCurrency);
+    return `<g><line class="sales-chart-gridline" x1="${chartLeft}" y1="${y}" x2="${chartRight}" y2="${y}"></line><text class="sales-chart-tick" x="0" y="${y+4}">${label}</text></g>`;
   }).join('');
-  const pendingHtml=pending.slice().sort((a,b)=>Number(b.total)-Number(a.total)).slice(0,5).map(s=>`<div class="payment-row"><span>${escapeHtml(s.customer)}<br><small class="muted">${escapeHtml(s.id.slice(0,8))} · Abonado ${money(s.paid)}</small></span><span class="orange">${money(Number(s.total)-Number(s.paid))}</span></div>`).join('')||'<p class="muted">No hay apartados pendientes.</p>';
+  const chartDates=chartPoints.map(point=>`<text class="sales-chart-date" x="${point.x}" y="${chartHeight-3}">${escapeHtml(point.day.label)}</text>`).join('');
+  const chartMarkers=chartPoints.map(point=>`<circle class="sales-chart-point${point.day.key===now?' is-today':''}" cx="${point.x}" cy="${point.y}" r="${point.day.key===now?5:3.5}"><title>${escapeHtml(point.day.label)} · ${money(point.day.total)}</title></circle>`).join('');
+  const weeklyTotal=salesByDay.reduce((sum,day)=>sum+day.total,0);
+  const pendingHtml=pending.slice().sort((a,b)=>convertCurrencyAmount(b.total-b.paid,b.currency||'CRC','CRC')-convertCurrencyAmount(a.total-a.paid,a.currency||'CRC','CRC')).slice(0,5).map(s=>`<div class="payment-row"><span>${escapeHtml(s.customer)}<br><small class="muted">${escapeHtml(s.id.slice(0,8))} · Abonado ${money(s.paid,s.currency)}</small></span><span class="orange">${money(Number(s.total)-Number(s.paid),s.currency)}</span></div>`).join('')||'<p class="muted">No hay apartados pendientes.</p>';
   const featuredProducts=state.products.slice(0,5).map(p=>`<div class="featured-product"><span class="featured-icon" aria-hidden="true">◇</span><span class="featured-info"><b>${escapeHtml(p.name)}</b><small>Talla: ${escapeHtml(p.size||'—')} · Stock: ${Number(p.stock)}</small></span><strong>${money(p.price,p.currency)}</strong></div>`).join('')||'<p class="muted">Agrega productos para verlos aquí.</p>';
   c.innerHTML=`
     <div class="content-intro"><div><h2>Resumen del negocio</h2><p>Controla tus ventas, inventario y apartados</p></div></div>
     <section class="card sales-overview">
-      <div class="sales-overview-heading"><div><div class="label">Monto total vendido</div><div class="sales-overview-total">${money(crc.total)} <small>CRC</small></div></div><span class="sales-period">Últimos 7 días</span></div>
-      <div class="chart sales-overview-chart" role="img" aria-label="Gráfica de ventas de los últimos siete días">${bars}</div>
-      <div class="sales-chart-axis"><span>${escapeHtml(salesByDay[0].label)}</span><span>${escapeHtml(salesByDay[6].label)}</span></div>
+      <div class="sales-overview-heading"><div><div class="label">Ventas de los últimos 7 días</div><div class="sales-overview-total">${money(weeklyTotal,state.chartCurrency)} <small>${state.chartCurrency}</small></div></div><label class="sales-currency-control"><span>Ver en</span><select aria-label="Moneda de la gráfica" onchange="setChartCurrency(this.value)"><option value="CRC" ${state.chartCurrency==='CRC'?'selected':''}>CRC · Colones</option><option value="USD" ${state.chartCurrency==='USD'?'selected':''}>USD · Dólares</option></select></label></div>
+      <div class="sales-overview-chart" role="img" aria-label="Gráfica de ventas de los últimos siete días, expresadas en ${currencyLabel(state.chartCurrency)}; los montos de otras monedas se convierten a ₡460 por dólar">
+        <svg viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="salesChartGradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#ff5817" stop-opacity=".42"></stop><stop offset="100%" stop-color="#ff5817" stop-opacity=".015"></stop></linearGradient></defs>
+          ${chartGrid}
+          <path class="sales-chart-area" d="${areaPath}"></path>
+          <path class="sales-chart-line" d="${linePath}"></path>
+          ${chartMarkers}
+          ${chartDates}
+        </svg>
+      </div>
     </section>
     <div class="grid overview-metrics">
       ${metricCard('Ventas registradas',money(crc.total),'▣','')}
-      ${metricCard('Costo de mercadería',money(inventoryCost),'◇','green')}
+      <div class="card metric-card inventory-cost-card"><div class="metric-left"><span class="metric-icon green">◇</span><div><div class="label">Costo de mercadería</div><div class="metric">${money(inventoryCost,state.inventoryCostCurrency)}</div></div></div><label class="inventory-cost-currency-control"><span>Ver en</span><select aria-label="Moneda del costo de mercadería" onchange="setInventoryCostCurrency(this.value)"><option value="CRC" ${state.inventoryCostCurrency==='CRC'?'selected':''}>CRC</option><option value="USD" ${state.inventoryCostCurrency==='USD'?'selected':''}>USD</option></select></label></div>
       ${metricCard('Gastos totales',money(crc.expenses),'▦','blue')}
       ${metricCard('Dinero en apartados',money(pendingTotal),'⬡','yellow',`${pending.length} activos`)}
     </div>
@@ -347,22 +357,22 @@ function saleTable(n=99) {
   return `<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows.map(s=>`<tr><td><b>${escapeHtml(s.customer)}</b><br><span class="muted">${escapeHtml(s.id)}</span></td><td>${money(s.total,s.currency)}</td><td>${money(s.paid,s.currency)}</td><td><span class="badge ${s.paid>=s.total?'green':'orange'}">${s.paid>=s.total?'Pagada':'Pendiente'}</span></td><td class="sale-actions"><div class="actions">${s.paid<s.total?`<button class="primary small" onclick="openPayment('${s.id}')">ABONO</button>`:''}<button class="delete-button" onclick="deleteSale('${s.id}')">ELIMINAR</button></div></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No hay ventas todavía.</td></tr>'}</tbody></table></div>`;
 }
 
-function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos registrados en colones costarricenses.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
+function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos en colones o dólares, según la moneda elegida para cada venta.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
 
 function inventory(c){
-  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Sneakers, hoodies y artículos en bodega</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Talla</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name">${escapeHtml(p.name)}</td><td>${escapeHtml(p.size||'—')}</td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.currency)}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Sneakers, hoodies y artículos en bodega</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Talla</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span>${escapeHtml(p.name)}</span><button class="secondary small inventory-cost-edit" onclick="openProductCost('${p.id}')">EDITAR COSTO · ${p.cost_currency||p.currency||'CRC'}</button></td><td>${escapeHtml(p.size||'—')}</td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function finance(c){
   const crc=totals('CRC');
-  c.innerHTML=`<div class="content-intro"><div><h2>Gastos</h2><p>Control de salidas de dinero en colones costarricenses.</p></div><button class="primary" onclick="openExpense()">+ REGISTRAR GASTO</button></div><div class="grid stats"><div class="card"><div class="label">Ventas registradas</div><div class="metric">${money(crc.total)}</div></div><div class="card"><div class="label">Gastos acumulados</div><div class="metric orange">${money(crc.expenses)}</div></div></div><div class="section-title"><h2>Movimientos de gastos</h2></div><div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>${state.expenses.slice().reverse().map(x=>`<tr><td>${escapeHtml(x.note)}</td><td>${money(x.amount)}</td><td>${dateKey(x.created_at)}</td><td><button class="delete-button" onclick="deleteExpense('${x.id}')">QUITAR</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">No hay gastos. Registra el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Gastos</h2><p>Registra gastos en colones o dólares; los resúmenes se muestran en colones.</p></div><button class="primary" onclick="openExpense()">+ REGISTRAR GASTO</button></div><div class="grid stats"><div class="card"><div class="label">Ventas (equiv. CRC)</div><div class="metric">${money(crc.total)}</div></div><div class="card"><div class="label">Gastos (equiv. CRC)</div><div class="metric orange">${money(crc.expenses)}</div></div></div><div class="section-title"><h2>Movimientos de gastos</h2></div><div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>${state.expenses.slice().reverse().map(x=>`<tr><td>${escapeHtml(x.note)}</td><td>${money(x.amount,x.currency)}</td><td>${dateKey(x.created_at)}</td><td><button class="delete-button" onclick="deleteExpense('${x.id}')">QUITAR</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">No hay gastos. Registra el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function customers(c){c.innerHTML=`<div class="content-intro"><div><h2>Clientes</h2><p>Administra la lista de clientes de tu tienda.</p></div><button class="primary" onclick="openCustomer()">+ CLIENTE</button></div><div class="product-list">${state.customers.map(x=>`<div class="card"><div class="product-head"><span class="metric-icon yellow">♙</span><button class="delete-button" onclick="deleteCustomer('${x.id}')">QUITAR</button></div><h3>${escapeHtml(x.name)}</h3><div class="muted">${escapeHtml(x.phone||'Sin teléfono')}</div>${x.email?`<div class="muted">${escapeHtml(x.email)}</div>`:''}</div>`).join('')||'<div class="card muted">Agrega tu primer cliente.</div>'}</div>`;}
 
 function installments(c){
   const rows=state.sales.filter(s=>Number(s.paid)<Number(s.total)||s.payments.length).slice().reverse();
-  c.innerHTML=`<div class="content-intro"><div><h2>Apartados</h2><p>Control de pagos parciales y saldos pendientes</p></div><button class="primary" onclick="openSale()">♧ <span>NUEVO APARTADO</span></button></div><div class="installment-list">${rows.map(s=>{const balance=Math.max(Number(s.total)-Number(s.paid),0), progress=Number(s.total)>0?Math.min(Number(s.paid)/Number(s.total)*100,100):0;return `<article class="card installment-card"><div class="installment-heading"><div><h3>${escapeHtml(s.customer)}</h3><p>${escapeHtml((s.sale_items||[]).map(item=>item.products?.name||'Producto').join(', ')||s.id)}</p></div><span class="badge ${balance?'orange':'green'}">${balance?'Pendiente':'Pagado'}</span></div><div class="installment-totals"><span>Abonado: <b>${money(s.paid)}</b></span><span>Resta: <b class="${balance?'orange':''}">${money(balance)}</b></span></div><div class="progress-track"><span style="width:${progress}%"></span></div><div class="installment-actions">${balance?`<button class="installment-pay" onclick="openPayment('${s.id}')">+ Abonar plata</button>`:''}</div><div class="payment-list">${s.payments.map(p=>`<div class="payment-row"><span><span class="payment-amount">${money(p.amount)}</span><br><small class="muted">${dateKey(p.created_at)}</small></span><button class="delete-button" onclick="deletePayment('${s.id}','${p.id}')">QUITAR ABONO</button></div>`).join('')}</div></article>`;}).join('')||'<div class="card muted">No hay apartados ni abonos. Registra una venta con un pago parcial para empezar.</div>'}</div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Apartados</h2><p>Control de pagos parciales y saldos pendientes</p></div><button class="primary" onclick="openSale()">♧ <span>NUEVO APARTADO</span></button></div><div class="installment-list">${rows.map(s=>{const balance=Math.max(Number(s.total)-Number(s.paid),0), progress=Number(s.total)>0?Math.min(Number(s.paid)/Number(s.total)*100,100):0;return `<article class="card installment-card"><div class="installment-heading"><div><h3>${escapeHtml(s.customer)}</h3><p>${escapeHtml((s.sale_items||[]).map(item=>item.products?.name||'Producto').join(', ')||s.id)} · ${s.currency==='USD'?'USD · Dólares':'CRC · Colones'}</p></div><span class="badge ${balance?'orange':'green'}">${balance?'Pendiente':'Pagado'}</span></div><div class="installment-totals"><span>Abonado: <b>${money(s.paid,s.currency)}</b></span><span>Resta: <b class="${balance?'orange':''}">${money(balance,s.currency)}</b></span></div><div class="progress-track"><span style="width:${progress}%"></span></div><div class="installment-actions">${balance?`<button class="installment-pay" onclick="openPayment('${s.id}')">+ Abonar plata</button>`:''}</div><div class="payment-list">${s.payments.map(p=>`<div class="payment-row"><span><span class="payment-amount">${money(p.amount,p.currency||s.currency)}</span><br><small class="muted">${dateKey(p.created_at)}</small></span><button class="delete-button" onclick="deletePayment('${s.id}','${p.id}')">QUITAR ABONO</button></div>`).join('')}</div></article>`;}).join('')||'<div class="card muted">No hay apartados ni abonos. Registra una venta con un pago parcial para empezar.</div>'}</div>`;
 }
 
 function history(c){
@@ -378,35 +388,48 @@ function closeModal(){$('#modal').classList.add('hidden');}
 
 function openSale(){
   if(!state.products.length) return toast('Primero agrega un producto');
-  modal(`<h2>NUEVA VENTA</h2><div class="form"><label>Cliente<select id="fCustomer"><option value="">Cliente nuevo / sin registrar</option>${state.customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></label><label>Producto<select id="fProduct">${state.products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} — ${money(p.price,p.currency)} — stock ${p.stock}</option>`).join('')}</select></label><div class="form-grid"><label>Cantidad<input id="fQty" type="number" min="1" value="1"></label><label>Pago recibido<input id="fPaid" type="number" min="0" value="0"></label></div><div class="total-box">TOTAL<strong id="saleTotal">₡0</strong><small id="saleCurrencyHint"></small></div><button class="primary" onclick="createSale()">REGISTRAR VENTA</button></div>`);
+  const firstCurrency=state.products[0].currency==='USD'?'USD':'CRC';
+  modal(`<h2>NUEVA VENTA</h2><div class="form"><label>Cliente<select id="fCustomer"><option value="">Cliente nuevo / sin registrar</option>${state.customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></label><label>Producto<select id="fProduct">${state.products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} — ${money(p.price,p.currency)} — stock ${p.stock}</option>`).join('')}</select></label><label>Moneda de la venta<select id="fCurrency"><option value="CRC" ${firstCurrency==='CRC'?'selected':''}>CRC · Colones</option><option value="USD" ${firstCurrency==='USD'?'selected':''}>USD · Dólares</option></select></label><div class="form-grid"><label>Cantidad<input id="fQty" type="number" min="1" value="1"></label><label>Pago recibido<input id="fPaid" type="number" min="0" step="0.01" value="0"></label></div><div class="total-box">TOTAL<strong id="saleTotal">₡0</strong><small id="saleCurrencyHint"></small></div><button class="primary" onclick="createSale()">REGISTRAR VENTA</button></div>`);
+  let inputCurrency=firstCurrency;
   ['fProduct','fQty'].forEach(id=>$('#'+id).addEventListener('input',updateSaleTotal));
+  $('#fCurrency').addEventListener('change',event=>{
+    const newCurrency=event.target.value;
+    const paid=Number($('#fPaid').value||0);
+    if(paid)$('#fPaid').value=convertCurrencyAmount(paid,inputCurrency,newCurrency).toFixed(2);
+    inputCurrency=newCurrency;
+    updateSaleTotal();
+  });
   updateSaleTotal();
 }
 
 function updateSaleTotal(){
   const p=state.products.find(x=>x.id===$('#fProduct')?.value); if(!p)return;
-  $('#saleTotal').textContent=money(Number(p.price)*Number($('#fQty').value||1),p.currency);
-  $('#saleCurrencyHint').textContent=`Moneda de la venta: ${p.currency==='USD'?'Dólares':'Colones'}`;
+  const currency=$('#fCurrency').value;
+  const unitPrice=convertCurrencyAmount(p.price,p.currency||'CRC',currency);
+  $('#saleTotal').textContent=money(unitPrice*Number($('#fQty').value||1),currency);
+  $('#saleCurrencyHint').textContent=`Precio del producto convertido de ${currencyLabel(p.currency||'CRC')} a ${currencyLabel(currency)} (₡${USD_TO_CRC_RATE} por US$1).`;
 }
 
 async function createSale(){
   const p=state.products.find(x=>x.id===$('#fProduct').value);
-  const qty=Number($('#fQty').value), paid=Number($('#fPaid').value||0), customerId=$('#fCustomer').value||null;
+  const qty=Number($('#fQty').value), paid=Number($('#fPaid').value||0), currency=$('#fCurrency').value, customerId=$('#fCustomer').value||null;
   if(!p||qty<=0)return toast('Datos de venta inválidos');
   if(qty>Number(p.stock))return toast('No hay suficiente stock');
-  const total=Number(p.price)*qty;
+  const unitPrice=convertCurrencyAmount(p.price,p.currency||'CRC',currency);
+  const unitCost=convertCurrencyAmount(p.cost,p.cost_currency||p.currency||'CRC',currency);
+  const total=unitPrice*qty;
   const realPaid=Math.min(Math.max(paid,0),total);
   const status=realPaid>=total?'paid':'pending';
   setSync(true,'Guardando venta...');
 
-  const {data:sale,error:saleErr}=await db.from('sales').insert({customer_id:customerId,total,paid:realPaid,currency:p.currency,status,created_by:state.user.id}).select().single();
+  const {data:sale,error:saleErr}=await db.from('sales').insert({customer_id:customerId,total,paid:realPaid,currency,status,created_by:state.user.id}).select().single();
   if(saleErr){console.error(saleErr);setSync(false,'Error guardando');return toast('No se pudo registrar la venta');}
 
-  const {error:itemErr}=await db.from('sale_items').insert({sale_id:sale.id,product_id:p.id,quantity:qty,unit_price:p.price,unit_cost:p.cost});
+  const {error:itemErr}=await db.from('sale_items').insert({sale_id:sale.id,product_id:p.id,quantity:qty,unit_price:unitPrice,unit_cost:unitCost});
   if(itemErr){console.error(itemErr);toast('Venta creada, pero falló el detalle');}
 
   if(realPaid>0){
-    const {error:payErr}=await db.from('payments').insert({sale_id:sale.id,amount:realPaid,currency:p.currency,created_by:state.user.id});
+    const {error:payErr}=await db.from('payments').insert({sale_id:sale.id,amount:realPaid,currency,created_by:state.user.id});
     if(payErr)console.error(payErr);
   }
 
@@ -529,14 +552,32 @@ async function shareReceiptText(id,amount){
   await navigator.clipboard?.writeText(text); toast('Comprobante copiado; pégalo en WhatsApp');
 }
 
-function openProduct(){modal(`<h2>NUEVO PRODUCTO</h2><div class="form"><label>Nombre<input id="pName" required></label><div class="form-grid"><label>Talla<input id="pSize" placeholder="Ej. S, M, L, 38 o UNSIZE"></label><label>Stock inicial<input id="pStock" type="number" value="1" min="0" step="1"></label><label>Costo (CRC)<input id="pCost" type="number" value="0" min="0" step="0.01"></label><label>Precio (CRC)<input id="pPrice" type="number" value="0" min="0" step="0.01"></label></div><p class="muted">Todos los precios se guardan en colones costarricenses.</p><button class="primary" onclick="createProduct()">GUARDAR PRODUCTO</button></div>`);}
+function openProduct(){modal(`<h2>NUEVO PRODUCTO</h2><div class="form"><label>Nombre<input id="pName" required></label><div class="form-grid"><label>Talla<input id="pSize" placeholder="Ej. S, M, L, 38 o UNSIZE"></label><label>Stock inicial<input id="pStock" type="number" value="1" min="0" step="1"></label><label>Moneda del costo<select id="pCostCurrency"><option value="CRC">CRC · Colones</option><option value="USD">USD · Dólares</option></select></label><label>Costo unitario<input id="pCost" type="number" value="0" min="0" step="0.01"></label><label>Moneda del precio de venta<select id="pPriceCurrency"><option value="CRC">CRC · Colones</option><option value="USD">USD · Dólares</option></select></label><label>Precio unitario<input id="pPrice" type="number" value="0" min="0" step="0.01"></label></div><p class="muted">El costo y el precio pueden usar monedas distintas. Cambiar la moneda no modifica el stock.</p><button class="primary" onclick="createProduct()">GUARDAR PRODUCTO</button></div>`);}
 
 async function createProduct(){
   const name=$('#pName').value.trim(), stock=Number($('#pStock').value), cost=Number($('#pCost').value), price=Number($('#pPrice').value);
   if(!name||![stock,cost,price].every(Number.isFinite)||stock<0||cost<0||price<0)return toast('Revisa el nombre, stock, costo y precio.');
-  const row={name,size:$('#pSize').value.trim()||null,stock,cost,price,currency:'CRC'};
+  const row={name,size:$('#pSize').value.trim()||null,stock,cost,price,cost_currency:$('#pCostCurrency').value,currency:$('#pPriceCurrency').value};
   const {error}=await db.from('products').insert(row); if(error){console.error(error);return toast(`No se pudo guardar el producto: ${error.message}`);}
   await loadAll();closeModal();render('inventory');toast('PRODUCTO GUARDADO EN LA NUBE');
+}
+
+function openProductCost(id){
+  const product=state.products.find(row=>row.id===id);
+  if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
+  const currency=product.cost_currency||product.currency||'CRC';
+  modal(`<h2>EDITAR COSTO UNITARIO</h2><p>${escapeHtml(product.name)} · Stock actual: <b>${Number(product.stock)}</b></p><div class="form"><label>Moneda del costo<select id="editCostCurrency"><option value="CRC" ${currency==='CRC'?'selected':''}>CRC · Colones</option><option value="USD" ${currency==='USD'?'selected':''}>USD · Dólares</option></select></label><label>Costo unitario<input id="editUnitCost" type="number" min="0" step="0.01" value="${Number(product.cost||0)}"></label><p class="muted">Solo se actualizarán el costo y su moneda. El stock y el precio de venta no cambiarán.</p><button class="primary" onclick="saveProductCost('${product.id}')">GUARDAR COSTO</button></div>`);
+}
+
+async function saveProductCost(id){
+  const product=state.products.find(row=>row.id===id);
+  const cost=Number($('#editUnitCost').value);
+  const costCurrency=$('#editCostCurrency').value;
+  if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
+  if(!Number.isFinite(cost)||cost<0||!['CRC','USD'].includes(costCurrency))return toast('Ingresa un costo y una moneda válidos.');
+  const {data,error}=await db.from('products').update({cost,cost_currency:costCurrency,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
+  if(error||!data){console.error('Product cost update:',error);return toast('No se pudo actualizar el costo unitario. Revisa la conexión y que Supabase tenga la columna cost_currency.');}
+  await loadAll();closeModal();render('inventory');toast('COSTO UNITARIO ACTUALIZADO; STOCK SIN CAMBIOS');
 }
 
 function openStockAdjustment(id){
@@ -574,19 +615,19 @@ async function deleteProduct(id){
   await loadAll();render('inventory');toast('PRODUCTO QUITADO DEL INVENTARIO');
 }
 
-function openExpense(){modal(`<h2>REGISTRAR GASTO</h2><div class="form"><label>Concepto<input id="eNote" required placeholder="Compra de mercadería, envío..."></label><label>Monto en colones (CRC)<input id="eAmount" type="number" min="0.01" step="0.01"></label><button class="primary" onclick="createExpense()">GUARDAR GASTO</button></div>`);}
+function openExpense(){modal(`<h2>REGISTRAR GASTO</h2><div class="form"><label>Concepto<input id="eNote" required placeholder="Compra de mercadería, envío..."></label><label>Moneda<select id="eCurrency"><option value="CRC">CRC · Colones</option><option value="USD">USD · Dólares</option></select></label><label>Monto<input id="eAmount" type="number" min="0.01" step="0.01"></label><button class="primary" onclick="createExpense()">GUARDAR GASTO</button></div>`);}
 
 async function createExpense(){
   const note=$('#eNote').value.trim(), amount=Number($('#eAmount').value);
   if(!note||!Number.isFinite(amount)||amount<=0)return toast('Ingresa el concepto y un monto válido.');
-  const row={note,amount,currency:'CRC',created_by:state.user.id};
+  const row={note,amount,currency:$('#eCurrency').value,created_by:state.user.id};
   const {error}=await db.from('expenses').insert(row); if(error){console.error(error);return toast('No se pudo guardar el gasto');}
   await loadAll();closeModal();render('finance');toast('GASTO REGISTRADO EN LA NUBE');
 }
 
 async function deleteExpense(id){
   const expense=state.expenses.find(row=>row.id===id); if(!expense)return;
-  if(!window.confirm(`¿Quitar el gasto "${expense.note}" por ${money(expense.amount)}?`))return;
+  if(!window.confirm(`¿Quitar el gasto "${expense.note}" por ${money(expense.amount,expense.currency)}?`))return;
   const {data,error}=await db.from('expenses').delete().eq('id',id).select('id').maybeSingle();
   if(error||!data){console.error('Expense delete:',error);return toast('No se pudo quitar el gasto.');}
   await loadAll();render('finance');toast('GASTO QUITADO');
@@ -625,7 +666,7 @@ async function deleteCustomer(id){
 async function deletePayment(saleId,paymentId){
   const sale=state.sales.find(row=>row.id===saleId), payment=sale?.payments.find(row=>row.id===paymentId);
   if(!sale||!payment)return toast('No se encontró el abono. Recarga la vista e inténtalo de nuevo.');
-  if(!window.confirm(`¿Quitar el abono de ${money(payment.amount)}? El saldo pendiente de la venta aumentará.`))return;
+  if(!window.confirm(`¿Quitar el abono de ${money(payment.amount,payment.currency||sale.currency)}? El saldo pendiente de la venta aumentará.`))return;
   const previousPaid=Number(sale.paid), newPaid=Math.max(0,previousPaid-Number(payment.amount));
   const previousStatus=sale.status, newStatus=newPaid>=Number(sale.total)?'paid':'pending';
   const {data:updated,error:updateError}=await db.from('sales').update({paid:newPaid,status:newStatus}).eq('id',saleId).eq('paid',previousPaid).select('id').maybeSingle();
