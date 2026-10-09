@@ -42,6 +42,7 @@ const convertCurrencyAmount = (amount, from, to) => {
   return from==='USD'?value*USD_TO_CRC_RATE:value/USD_TO_CRC_RATE;
 };
 const currencyLabel = currency => currency==='USD'?'dólares':'colones';
+let productPhotoPreviewUrl=null;
 
 const costaRicaDateKey = date => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -383,8 +384,8 @@ function history(c){
   c.innerHTML=`<div class="section-title"><h2>MOVIMIENTOS</h2></div><div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Detalle</th><th>Monto</th><th>Fecha</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge">${r.type}</span></td><td>${escapeHtml(r.desc)}</td><td>${money(r.amount,r.currency)}</td><td>${r.date}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No hay movimientos.</td></tr>'}</tbody></table></div>`;
 }
 
-function modal(html){$('#modalContent').innerHTML=html;$('#modal').classList.remove('hidden');}
-function closeModal(){$('#modal').classList.add('hidden');}
+function modal(html){if(productPhotoPreviewUrl){URL.revokeObjectURL(productPhotoPreviewUrl);productPhotoPreviewUrl=null;}$('#modalContent').innerHTML=html;$('#modal').classList.remove('hidden');}
+function closeModal(){if(productPhotoPreviewUrl){URL.revokeObjectURL(productPhotoPreviewUrl);productPhotoPreviewUrl=null;}$('#modal').classList.add('hidden');}
 
 function openSale(){
   if(!state.products.length) return toast('Primero agrega un producto');
@@ -572,7 +573,64 @@ function openProductCost(id){
 function openProductPhoto(id){
   const product=state.products.find(row=>row.id===id);
   if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
-  modal(`<h2>FOTO DEL PRODUCTO</h2><p>${escapeHtml(product.name)} · Stock actual: <b>${Number(product.stock)}</b></p><div class="form">${product.image_url?`<img class="product-photo-preview" src="${escapeHtml(product.image_url)}" alt="Foto actual de ${escapeHtml(product.name)}">`:'<div class="product-photo-empty">◇</div>'}<label>Seleccionar foto<input id="productPhotoFile" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="muted">Formatos JPG, PNG o WebP · máximo 5 MB. La foto no cambia el stock, el costo ni el precio.</p><button class="primary" onclick="saveProductPhoto('${product.id}')">GUARDAR FOTO</button></div>`);
+  modal(`<h2>FOTO DEL PRODUCTO</h2><p>${escapeHtml(product.name)} · Stock actual: <b>${Number(product.stock)}</b></p><div class="form"><img id="productPhotoPreview" class="product-photo-preview" src="${product.image_url?escapeHtml(product.image_url):''}" alt="${product.image_url?`Foto de ${escapeHtml(product.name)}`:'Vista previa de la foto seleccionada'}" ${product.image_url?'':'hidden'}><div id="productPhotoEmpty" class="product-photo-empty" ${product.image_url?'hidden':''}>◇</div><label>1. Seleccionar foto<input id="productPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" onchange="previewProductPhoto(this)"></label><p id="productPhotoSelection" class="muted" aria-live="polite">No has seleccionado una foto.</p><p class="muted">Formatos JPG, PNG o WebP. Las fotos grandes se optimizan automáticamente. La foto no cambia el stock, el costo ni el precio.</p><button id="saveProductPhotoButton" class="primary" onclick="saveProductPhoto('${product.id}')" disabled>2. GUARDAR FOTO</button></div>`);
+}
+
+function previewProductPhoto(input){
+  const file=input.files?.[0];
+  const selection=$('#productPhotoSelection');
+  const saveButton=$('#saveProductPhotoButton');
+  const preview=$('#productPhotoPreview');
+  const placeholder=$('#productPhotoEmpty');
+  if(productPhotoPreviewUrl){URL.revokeObjectURL(productPhotoPreviewUrl);productPhotoPreviewUrl=null;}
+  if(!file){
+    selection.textContent='No has seleccionado una foto.';
+    saveButton.disabled=true;
+    return;
+  }
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+    selection.textContent='Formato no compatible. Selecciona una foto JPG, PNG o WebP.';
+    saveButton.disabled=true;
+    return;
+  }
+  selection.textContent=`Foto lista: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB). Ahora toca GUARDAR FOTO.`;
+  saveButton.disabled=false;
+  productPhotoPreviewUrl=URL.createObjectURL(file);
+  preview.src=productPhotoPreviewUrl;
+  preview.hidden=false;
+  placeholder.hidden=true;
+}
+
+async function optimizeProductPhoto(file){
+  if(file.size<=5*1024*1024)return file;
+  let bitmap;
+  try{
+    bitmap=await createImageBitmap(file);
+  }catch(error){
+    throw new Error('No se pudo procesar esta foto. Prueba con un archivo JPG, PNG o WebP.');
+  }
+  try{
+    const maxDimension=2000;
+    let scale=Math.min(1,maxDimension/Math.max(bitmap.width,bitmap.height));
+    for(let attempt=0;attempt<8;attempt++){
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+      canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+      const context=canvas.getContext('2d');
+      if(!context)throw new Error('El navegador no pudo preparar la foto.');
+      context.drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const quality=Math.max(.45,.86-attempt%4*.12);
+      const blob=await new Promise((resolve,reject)=>canvas.toBlob(result=>result?resolve(result):reject(new Error('No se pudo comprimir la foto.')),'image/webp',quality));
+      if(blob.size<=5*1024*1024&&blob.type==='image/webp'){
+        const baseName=file.name.replace(/\.[^.]+$/,'')||'producto';
+        return new File([blob],`${baseName}.webp`,{type:'image/webp',lastModified:Date.now()});
+      }
+      if(attempt===3||attempt===6)scale*=.75;
+    }
+    throw new Error('La foto sigue siendo demasiado grande. Elige una imagen más pequeña.');
+  }finally{
+    bitmap.close();
+  }
 }
 
 async function saveProductPhoto(id){
@@ -580,21 +638,33 @@ async function saveProductPhoto(id){
   const file=$('#productPhotoFile')?.files?.[0];
   if(!product)return toast('No se encontró el producto. Recarga el inventario e inténtalo de nuevo.');
   if(!file)return toast('Selecciona una foto para continuar.');
-  const allowedTypes=['image/jpeg','image/png','image/webp'];
-  if(!allowedTypes.includes(file.type))return toast('Elige una foto JPG, PNG o WebP.');
-  if(file.size>5*1024*1024)return toast('La foto supera el límite de 5 MB.');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))return toast('Elige una foto JPG, PNG o WebP.');
+  const button=$('#saveProductPhotoButton');
+  button.disabled=true;
+  button.textContent='OPTIMIZANDO Y SUBIENDO…';
+  let uploadFile;
+  try{
+    uploadFile=await optimizeProductPhoto(file);
+  }catch(error){
+    console.error('Product photo processing:',error);
+    button.disabled=false;
+    button.textContent='2. GUARDAR FOTO';
+    return toast(error.message);
+  }
   const storagePath=`${product.id}/photo`;
-  const {error:uploadError}=await db.storage.from('product-images').upload(storagePath,file,{
+  const {error:uploadError}=await db.storage.from('product-images').upload(storagePath,uploadFile,{
     cacheControl:'3600',
-    contentType:file.type,
+    contentType:uploadFile.type,
     upsert:true
   });
-  if(uploadError){console.error('Product photo upload:',uploadError);return toast(`No se pudo subir la foto: ${uploadError.message}`);}
+  if(uploadError){console.error('Product photo upload:',uploadError);button.disabled=false;button.textContent='2. GUARDAR FOTO';return toast(`No se pudo subir la foto: ${uploadError.message}`);}
   const {data:{publicUrl}}=db.storage.from('product-images').getPublicUrl(storagePath);
   const imageUrl=`${publicUrl}?v=${Date.now()}`;
   const {data,error}=await db.from('products').update({image_url:imageUrl,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
   if(error||!data){
     console.error('Product photo update:',error);
+    button.disabled=false;
+    button.textContent='2. GUARDAR FOTO';
     return toast(`La foto se subió, pero no se pudo guardar en el producto: ${error?.message||'no se encontró el registro'}`);
   }
   await loadAll();closeModal();render('inventory');toast('FOTO DEL PRODUCTO ACTUALIZADA; INVENTARIO SIN CAMBIOS');

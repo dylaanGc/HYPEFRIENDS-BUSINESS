@@ -186,6 +186,8 @@ body{background:#090909}
 .inventory-cost-edit,.inventory-photo-edit{margin-top:0;white-space:nowrap;font-size:8px}
 .product-photo-preview{display:block;width:min(100%,320px);max-height:320px;aspect-ratio:1;object-fit:contain;margin:0 auto;border:1px solid #343438;border-radius:12px;background:#101011}
 .product-photo-empty{display:grid;place-items:center;width:min(100%,320px);aspect-ratio:1;margin:0 auto;border:1px dashed #454549;border-radius:12px;background:#101011;color:#85858a;font-size:48px}
+.product-photo-empty[hidden],.product-photo-preview[hidden]{display:none}
+#saveProductPhotoButton:disabled{opacity:.5;cursor:not-allowed}
 .inventory-price{font-weight:700;color:#fff!important}
 .stock-badge{display:inline-block;background:#102c24;color:#36d0a1;padding:6px 9px;border-radius:9px;font-weight:700}
 .installment-list{display:grid;gap:16px}
