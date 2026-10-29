@@ -6,7 +6,7 @@ const APP_FILES = [
   './app.js',
   './legacy-migration.js',
   './manifest.json',
-  './assets/icon.svg.png'
+  './assets/icon.svg.png.svg'
 ];
 
 self.addEventListener('install', event => {
