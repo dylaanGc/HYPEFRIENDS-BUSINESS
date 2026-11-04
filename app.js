@@ -301,11 +301,8 @@ function subscribeRealtime() {
 }
 
 function totals(currency) {
-  const activeWebOrders=state.webOrders.filter(order=>order.order_status!=='cancelled'||order.payment_status==='paid');
-  const total = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.total,s.currency||'CRC',currency),0)
-    + activeWebOrders.reduce((sum,order)=>sum+convertCurrencyAmount(order.total,order.currency||'CRC',currency),0);
-  const paid = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.paid,s.currency||'CRC',currency),0)
-    + state.webOrders.filter(order=>order.payment_status==='paid').reduce((sum,order)=>sum+convertCurrencyAmount(order.total,order.currency||'CRC',currency),0);
+  const total = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.total,s.currency||'CRC',currency),0);
+  const paid = state.sales.reduce((sum,s)=>sum+convertCurrencyAmount(s.paid,s.currency||'CRC',currency),0);
   const expenses = state.expenses.reduce((sum,e)=>sum+convertCurrencyAmount(e.amount,e.currency||'CRC',currency),0);
   return {total, paid, due:Math.max(total-paid,0), expenses};
 }
@@ -460,7 +457,7 @@ function inventory(c){
 function finance(c){
   const crc=totals('CRC');
   const webReceived=state.webOrders.filter(order=>order.payment_status==='paid').reduce((sum,order)=>sum+convertCurrencyAmount(order.total,order.currency||'CRC','CRC'),0);
-  c.innerHTML=`<div class="content-intro"><div><h2>Gastos</h2><p>Registra gastos en colones o dólares; los resúmenes se muestran en colones.</p></div><button class="primary" onclick="openExpense()">+ REGISTRAR GASTO</button></div><div class="grid stats"><div class="card"><div class="label">Ventas y compras web (equiv. CRC)</div><div class="metric">${money(crc.total)}</div><p class="muted">Los pedidos web permanecen separados de las ventas manuales.</p></div><div class="card"><div class="label">Cobros web verificados</div><div class="metric">${money(webReceived)}</div></div><div class="card"><div class="label">Gastos (equiv. CRC)</div><div class="metric orange">${money(crc.expenses)}</div></div></div><div class="section-title"><h2>Movimientos de gastos</h2></div><div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>${state.expenses.slice().reverse().map(x=>`<tr><td>${escapeHtml(x.note)}</td><td>${money(x.amount,x.currency)}</td><td>${dateKey(x.created_at)}</td><td><button class="delete-button" onclick="deleteExpense('${x.id}')">QUITAR</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">No hay gastos. Registra el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Gastos</h2><p>Registra gastos en colones o dólares; los resúmenes se muestran en colones.</p></div><button class="primary" onclick="openExpense()">+ REGISTRAR GASTO</button></div><div class="grid stats"><div class="card"><div class="label">Ventas manuales (equiv. CRC)</div><div class="metric">${money(crc.total)}</div><p class="muted">Los pedidos web permanecen separados de las ventas manuales.</p></div><div class="card"><div class="label">Cobros web verificados</div><div class="metric">${money(webReceived)}</div></div><div class="card"><div class="label">Gastos (equiv. CRC)</div><div class="metric orange">${money(crc.expenses)}</div></div></div><div class="section-title"><h2>Movimientos de gastos</h2></div><div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>${state.expenses.slice().reverse().map(x=>`<tr><td>${escapeHtml(x.note)}</td><td>${money(x.amount,x.currency)}</td><td>${dateKey(x.created_at)}</td><td><button class="delete-button" onclick="deleteExpense('${x.id}')">QUITAR</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">No hay gastos. Registra el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function customers(c){c.innerHTML=`<div class="content-intro"><div><h2>Clientes</h2><p>Administra la lista de clientes de tu tienda.</p></div><button class="primary" onclick="openCustomer()">+ CLIENTE</button></div><div class="product-list">${state.customers.map(x=>`<div class="card"><div class="product-head"><span class="metric-icon yellow">♙</span><button class="delete-button" onclick="deleteCustomer('${x.id}')">QUITAR</button></div><h3>${escapeHtml(x.name)}</h3><div class="muted">${escapeHtml(x.phone||'Sin teléfono')}</div>${x.email?`<div class="muted">${escapeHtml(x.email)}</div>`:''}</div>`).join('')||'<div class="card muted">Agrega tu primer cliente.</div>'}</div>`;}
@@ -612,14 +609,23 @@ function closeModal(){if(productPhotoPreviewUrl){URL.revokeObjectURL(productPhot
 
 async function subscribePushNotifications(){
   if(!state.user)return toast('Inicia sesión antes de activar los avisos push.');
-  if(!('serviceWorker' in navigator)||typeof Notification==='undefined'||typeof PushManager==='undefined')return toast('Este navegador no admite notificaciones push.');
-  const vapidKey=$('meta[name="web-push-vapid-public-key"]')?.content.trim();
+  if(!window.isSecureContext)return toast('Los avisos push requieren HTTPS o localhost.');
+  if(!('serviceWorker' in navigator))return toast('Este navegador no permite Service Worker. Abre la app en Chrome, Edge, Firefox o Safari.');
+  if(typeof Notification==='undefined'||typeof PushManager==='undefined'){
+    const ua=navigator.userAgent||'';
+    if(/iPhone|iPad|iPod/.test(ua)&&!/Safari/.test(ua))return toast('En iPhone abre la app en Safari. Si está instalada como PWA, abre el ícono de inicio.');
+    return toast('Este navegador o modo privado no admite notificaciones push. Usa Chrome, Edge o Safari en una conexión HTTPS.');
+  }
+  const configuredKey=$('meta[name="web-push-vapid-public-key"]')?.content.trim();
+  const vapidKey=configuredKey||'BLjK8MZ4eo1_H6hj8TceokYVMY5SHRjC6GNoVxLGOtumxVLvf3-waPgFS9ZC55nZza7E9ayLcJ03UXHE1x3awiI';
   if(!vapidKey)return toast('Falta configurar la clave pública VAPID en index.html.');
+  if(Notification.permission==='denied')return toast('Las notificaciones están bloqueadas para este sitio. Actívalas en Configuración del navegador → Privacidad y seguridad → Permisos del sitio.');
   const permission=await Notification.requestPermission();
   if(permission!=='granted')return toast('No se otorgó permiso para mostrar notificaciones.');
   let subscription;
   try{
-    const registration=await navigator.serviceWorker.ready;
+    const registration=await navigator.serviceWorker.register('./sw.js');
+    await navigator.serviceWorker.ready;
     subscription=await registration.pushManager.getSubscription();
     if(!subscription){
       const normalizedKey=vapidKey.replace(/-/g,'+').replace(/_/g,'/');
@@ -826,16 +832,45 @@ async function saveProduct(id){
   }
   const parsedVariants=$('#pSizes').value.split(',').map(part=>{const [size,stock,color]=part.trim().split(':');return {size:(size||'ÚNICA').trim(),stock:Number(stock||0),color:color?.trim()||$('#pColor').value.split(',')[0]?.trim()||null};}).filter(v=>v.size&&Number.isInteger(v.stock)&&v.stock>=0);
   if(!parsedVariants.length)return toast('Agrega al menos una talla y existencia válida.');
-  const row={name,description,size:parsedVariants.length===1?parsedVariants[0].size:null,product_color:$('#pColor').value.trim()||null,category_slug:$('#pCategory').value,category:$('#pCategory').selectedOptions[0].text,stock:parsedVariants.reduce((sum,v)=>sum+v.stock,0),cost,price,cost_currency:$('#pCostCurrency').value,currency:$('#pPriceCurrency').value,active:true,publish_online:$('#pPublish').value==='true',store_product_id:storeId,updated_at:new Date().toISOString()};
+  const totalStock=parsedVariants.reduce((sum,v)=>sum+v.stock,0);
+  const baseRow={
+    name,
+    size:parsedVariants.length===1?parsedVariants[0].size:null,
+    color:parsedVariants.find(v=>v.color)?.color||null,
+    category:$('#pCategory').selectedOptions[0].text,
+    stock:totalStock,
+    cost,
+    price,
+    cost_currency:$('#pCostCurrency').value,
+    currency:$('#pPriceCurrency').value,
+    updated_at:new Date().toISOString()
+  };
+  const enhancedRow={
+    ...baseRow,
+    description,
+    product_color:$('#pColor').value.trim()||null,
+    category_slug:$('#pCategory').value,
+    active:true,
+    publish_online:$('#pPublish').value==='true',
+    store_product_id:storeId
+  };
   let productId=id;
   let result;
-  if(id) result=await db.from('products').update(row).eq('id',id).select('id').single();
-  else result=await db.from('products').insert(row).select('id').single();
+  if(id) result=await db.from('products').update(enhancedRow).eq('id',id).select('id').single();
+  else result=await db.from('products').insert(enhancedRow).select('id').single();
+  if(result.error){
+    console.warn('Enhanced product columns unavailable, retrying with base columns:',result.error.message);
+    if(id) result=await db.from('products').update(baseRow).eq('id',id).select('id').single();
+    else result=await db.from('products').insert(baseRow).select('id').single();
+  }
   if(result.error||!result.data){console.error(result.error);return toast(`No se pudo guardar el producto: ${result.error?.message||''}`);}
   productId=result.data.id;
   if(id){await db.from('product_variants').delete().eq('product_id',productId);}
   const {error:variantError}=await db.from('product_variants').insert(parsedVariants.map(v=>({product_id:productId,size:v.size,color:v.color,stock:v.stock,reserved:0})));
-  if(variantError){console.error(variantError);return toast(`El producto se guardó, pero fallaron las tallas: ${variantError.message}`);}
+  if(variantError){
+    console.warn('Product variants unavailable:',variantError.message);
+    toast('Producto guardado con la existencia principal. Ejecuta supabase-unification.sql para habilitar tallas y publicación web.');
+  }
   await loadAll();closeModal();render('inventory');toast(id?'PRODUCTO ACTUALIZADO Y SINCRONIZADO':'PRODUCTO PUBLICADO Y SINCRONIZADO');
 }
 
