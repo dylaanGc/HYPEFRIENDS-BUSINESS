@@ -696,9 +696,64 @@ async function createSale(){
     p_items:[{product_id:p.id,variant_id:variantId,quantity:qty,unit_price:unitPrice,unit_cost:unitCost}],
     p_paid:realPaid,p_currency:currency,p_reference:null
   });
+  if(error && (error.code==='PGRST202'||error.status===404)){
+    const saleFallback=await createLocalSaleFallback({
+      product:p,variantId,qty,currency,customerId,unitPrice,unitCost,realPaid
+    });
+    if(saleFallback.error){console.error(saleFallback.error);setSync(false,'Error guardando');return toast(saleFallback.error.message||'No se pudo registrar la venta');}
+    await loadAll();closeModal();render('sales');toast('VENTA REGISTRADA EN LA NUBE');
+    if(realPaid>0){const createdSale=state.sales.find(row=>row.id===saleFallback.saleId);if(createdSale)showReceipt(createdSale,realPaid);}
+    return;
+  }
   if(error||!saleId){console.error(error);setSync(false,'Error guardando');return toast(error?.message||'No se pudo registrar la venta');}
   await loadAll();closeModal();render('sales');toast('VENTA REGISTRADA EN LA NUBE');
   if(realPaid>0){const createdSale=state.sales.find(row=>row.id===saleId);if(createdSale)showReceipt(createdSale,realPaid);}
+}
+
+async function createLocalSaleFallback({product,variantId,qty,currency,customerId,unitPrice,unitCost,realPaid}){
+  const {data:variant,error:variantError}=await db.from('product_variants')
+    .select('id,stock,reserved,product_id').eq('id',variantId).eq('product_id',product.id).single();
+  if(variantError)return {error:variantError};
+  const stock=Number(variant.stock||0),reserved=Number(variant.reserved||0);
+  if(qty>stock-reserved)return {error:{message:'No hay suficiente stock en esta talla'}};
+
+  const total=unitPrice*qty;
+  const {data:sale,error:saleError}=await db.from('sales').insert({
+    customer_id:customerId,total,paid:realPaid,currency,status:realPaid>=total?'paid':'pending',created_by:state.user.id
+  }).select('id').single();
+  if(saleError)return {error:saleError};
+
+  try{
+    const {error:itemError}=await db.from('sale_items').insert({
+      sale_id:sale.id,product_id:product.id,variant_id:variantId,quantity:qty,unit_price:unitPrice,unit_cost:unitCost
+    });
+    if(itemError)throw itemError;
+    const {error:updateError}=await db.from('product_variants').update({
+      stock:stock-qty,updated_at:new Date().toISOString()
+    }).eq('id',variantId).eq('stock',stock);
+    if(updateError)throw updateError;
+    const {data:variants}=await db.from('product_variants').select('stock').eq('product_id',product.id);
+    const productStock=(variants||[]).reduce((sum,row)=>sum+Number(row.stock||0),0);
+    await db.from('products').update({stock:productStock,updated_at:new Date().toISOString()}).eq('id',product.id);
+    await db.from('inventory_movements').insert({
+      product_id:product.id,variant_id:variantId,movement_type:'sale',quantity:qty,
+      reason:'Venta local',reference_id:sale.id,created_by:state.user.id
+    });
+    if(realPaid>0){
+      const {error:paymentError}=await db.from('payments').insert({
+        sale_id:sale.id,amount:realPaid,currency,created_by:state.user.id
+      });
+      if(paymentError)throw paymentError;
+    }
+    return {saleId:sale.id,error:null};
+  }catch(error){
+    await db.from('product_variants').update({stock,updated_at:new Date().toISOString()}).eq('id',variantId);
+    await db.from('sale_items').delete().eq('sale_id',sale.id);
+    await db.from('payments').delete().eq('sale_id',sale.id);
+    await db.from('inventory_movements').delete().eq('reference_id',sale.id);
+    await db.from('sales').delete().eq('id',sale.id);
+    return {error};
+  }
 }
 
 async function deleteSale(id){
