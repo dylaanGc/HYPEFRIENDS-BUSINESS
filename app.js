@@ -691,7 +691,7 @@ async function createSale(){
   const total=unitPrice*qty;
   const realPaid=Math.min(Math.max(paid,0),total);
   setSync(true,'Guardando venta...');
-  const {data:saleId,error}=await db.rpc('create_local_sale',{
+  const {data:saleId,error}=await db.rpc('create_local_sale_v2',{
     p_customer_id:customerId,
     p_items:[{product_id:p.id,variant_id:variantId,quantity:qty,unit_price:unitPrice,unit_cost:unitCost}],
     p_paid:realPaid,p_currency:currency,p_reference:null
