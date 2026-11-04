@@ -748,6 +748,9 @@ async function createLocalSaleFallback({product,variantId,qty,currency,customerI
     return {saleId:sale.id,error:null};
   }catch(error){
     await db.from('product_variants').update({stock,updated_at:new Date().toISOString()}).eq('id',variantId);
+    const {data:restoredVariants}=await db.from('product_variants').select('stock').eq('product_id',product.id);
+    const restoredStock=(restoredVariants||[]).reduce((sum,row)=>sum+Number(row.stock||0),0);
+    await db.from('products').update({stock:restoredStock,updated_at:new Date().toISOString()}).eq('id',product.id);
     await db.from('sale_items').delete().eq('sale_id',sale.id);
     await db.from('payments').delete().eq('sale_id',sale.id);
     await db.from('inventory_movements').delete().eq('reference_id',sale.id);
