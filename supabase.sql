@@ -26,6 +26,13 @@ create table if not exists public.products (
   updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists description text;
+alter table public.products add column if not exists active boolean not null default true;
+alter table public.products add column if not exists publish_online boolean not null default true;
+alter table public.products add column if not exists store_product_id text;
+alter table public.products add column if not exists category_slug text;
+alter table public.products add column if not exists product_color text;
+
 alter table public.products add column if not exists image_url text;
 alter table public.products add column if not exists cost_currency text;
 update public.products set cost_currency=currency where cost_currency is null;

@@ -376,8 +376,8 @@ begin
     insert into public.web_order_items (order_id,store_product_id,product_name,sku,variant,size,color,quantity,unit_price)
     values (
       v_order.id,v_item->>'store_product_id',btrim(v_item->>'product_name'),nullif(btrim(v_item->>'sku'),''),
-      nullif(btrim(v_item->>'variant),''),nullif(btrim(v_item->>'size),''),
-      nullif(btrim(v_item->>'color),''),(v_item->>'quantity')::integer,
+      nullif(btrim(v_item->>'variant'),''),nullif(btrim(v_item->>'size'),''),
+      nullif(btrim(v_item->>'color'),''),(v_item->>'quantity')::integer,
       (v_item->>'unit_price')::numeric(12,2)
     );
   end loop;

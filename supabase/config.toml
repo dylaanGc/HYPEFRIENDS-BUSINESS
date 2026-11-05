@@ -1,0 +1,5 @@
+[functions.create-web-order]
+verify_jwt = false
+
+[functions.send-web-order-push]
+verify_jwt = false

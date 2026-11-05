@@ -220,6 +220,7 @@ create trigger trg_web_order_cancel_restore after update on public.web_orders
 for each row execute function public.web_order_cancel_restore_trigger();
 
 -- Vista web con existencias centrales.
+drop view if exists public.web_store_catalog_inventory;
 create or replace view public.web_store_catalog_inventory
 with (security_invoker=true) as
 select c.store_product_id,c.product_name,c.unit_price,c.currency,c.category,c.image_url,c.description,c.available_sizes,c.active,c.drop_available_at,
