@@ -136,6 +136,42 @@ function instructionsFor(paymentMethod: string, orderNumber: string): string {
   return "Pagarás el pedido cuando lo recibas.";
 }
 
+async function notifyNewWebOrder(
+  supabaseUrl: string,
+  order: {
+    id: string;
+    order_number: string;
+    customer_name: string;
+    total: number;
+    currency: string;
+    created_at: string;
+  },
+) {
+  const pushSecret = Deno.env.get("WEB_ORDER_PUSH_WEBHOOK_SECRET");
+  if (!pushSecret) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/functions/v1/send-web-order-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-webhook-secret": pushSecret,
+      },
+      body: JSON.stringify({
+        type: "INSERT",
+        table: "web_orders",
+        schema: "public",
+        record: order,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch (error) {
+    console.error("New order push dispatch:", error instanceof Error ? error.message : String(error));
+  }
+}
+
 Deno.serve(async (request: Request) => {
   const origin = request.headers.get("Origin") ?? "";
   if (!allowedOrigins().has(origin)) {
@@ -430,6 +466,15 @@ Deno.serve(async (request: Request) => {
     console.error("Order creation:", createError?.message ?? "Unexpected database response.");
     return respond(request, 400, { error: "No se pudo registrar el pedido. Tu carrito sigue guardado." });
   }
+
+  await notifyNewWebOrder(supabaseUrl, {
+    id: orderId,
+    order_number: orderNumber,
+    customer_name: customerName,
+    total,
+    currency: "CRC",
+    created_at: new Date().toISOString(),
+  });
 
   return respond(request, 200, {
     orderId,
