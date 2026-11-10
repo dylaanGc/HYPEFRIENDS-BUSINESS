@@ -55,6 +55,7 @@ try {
   & $supabase.Source db query --remote=$ProjectRef --file "$repoRoot\supabase.sql" --yes
   & $supabase.Source db query --remote=$ProjectRef --file "$repoRoot\supabase-web-orders.sql" --yes
   & $supabase.Source db query --remote=$ProjectRef --file "$repoRoot\supabase-unification.sql" --yes
+  & $supabase.Source db query --remote=$ProjectRef --file "$repoRoot\supabase-inventory-store-sync.sql" --yes
 
   $secretLines = @(
     "TURNSTILE_SECRET_KEY=$TurnstileSecret",

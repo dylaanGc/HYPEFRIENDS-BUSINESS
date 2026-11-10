@@ -451,7 +451,7 @@ function saleTable(n=99) {
 function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos en colones o dólares, según la moneda elegida para cada venta.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
 
 function inventory(c){
-  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Productos, tallas, variantes y publicación online sincronizada</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Categoria / Tallas</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span class="inventory-thumb">${p.image_url?`<img src="${escapeHtml(p.image_url)}" alt="Foto de ${escapeHtml(p.name)}" loading="lazy">`:'◇'}</span><span class="inventory-product-info"><span>${escapeHtml(p.name)}</span><span class="muted">${p.publish_online!==false?'Publicado en tienda':'No publicado'}</span><button class="secondary small inventory-photo-edit" onclick="openProductPhoto('${p.id}')">${p.image_url?'CAMBIAR FOTO':'AGREGAR FOTO'}</button></span></td><td>${escapeHtml(p.category_slug||p.category||'General')}<br><span class="muted">${escapeHtml((p.variants||[]).map(v=>`${v.size}: ${v.stock}`).join(', ')||p.size||'—')}</span></td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openProduct('${p.id}')">EDITAR</button><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Productos, tallas, variantes y publicación online sincronizada</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Categoria / Tallas</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span class="inventory-thumb">${p.image_url?`<img src="${escapeHtml(p.image_url)}" alt="Foto de ${escapeHtml(p.name)}" loading="lazy">`:'◇'}</span><span class="inventory-product-info"><span>${escapeHtml(p.name)}</span><span class="muted">${p.publish_online===false||p.active===false?'No publicado':p.store_product_id?'Publicado en tienda':'Pendiente de sincronizar'}</span><button class="secondary small inventory-photo-edit" onclick="openProductPhoto('${p.id}')">${p.image_url?'CAMBIAR FOTO':'AGREGAR FOTO'}</button></span></td><td>${escapeHtml(p.category_slug||p.category||'General')}<br><span class="muted">${escapeHtml((p.variants||[]).map(v=>`${v.size}: ${v.stock}`).join(', ')||p.size||'—')}</span></td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openProduct('${p.id}')">EDITAR</button><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function finance(c){
@@ -890,6 +890,15 @@ async function saveProduct(id){
   }
   const parsedVariants=$('#pSizes').value.split(',').map(part=>{const [size,stock,color]=part.trim().split(':');return {size:(size||'ÚNICA').trim(),stock:Number(stock||0),color:color?.trim()||$('#pColor').value.split(',')[0]?.trim()||null};}).filter(v=>v.size&&Number.isInteger(v.stock)&&v.stock>=0);
   if(!parsedVariants.length)return toast('Agrega al menos una talla y existencia válida.');
+  const variantKeys=parsedVariants.map(v=>`${v.size}\u0000${v.color||''}`);
+  if(new Set(variantKeys).size!==variantKeys.length)return toast('Hay tallas repetidas con el mismo color.');
+  const currentVariants=id?(state.products.find(row=>row.id===id)?.variants||[]):[];
+  for(const current of currentVariants){
+    const key=`${current.size}\u0000${current.color||''}`;
+    const next=parsedVariants.find(v=>`${v.size}\u0000${v.color||''}`===key);
+    if(Number(current.reserved||0)>0&&!next)return toast(`No puedes quitar ${current.size}: tiene unidades reservadas en pedidos web.`);
+    if(next&&next.stock<Number(current.reserved||0))return toast(`La existencia de ${current.size} no puede ser menor que las unidades reservadas en pedidos web.`);
+  }
   const totalStock=parsedVariants.reduce((sum,v)=>sum+v.stock,0);
   const baseRow={
     name,
@@ -913,21 +922,33 @@ async function saveProduct(id){
     store_product_id:storeId
   };
   let productId=id;
-  let result;
-  if(id) result=await db.from('products').update(enhancedRow).eq('id',id).select('id').single();
-  else result=await db.from('products').insert(enhancedRow).select('id').single();
-  if(result.error){
-    console.warn('Enhanced product columns unavailable, retrying with base columns:',result.error.message);
-    if(id) result=await db.from('products').update(baseRow).eq('id',id).select('id').single();
-    else result=await db.from('products').insert(baseRow).select('id').single();
+  const result=id
+    ? await db.from('products').update(enhancedRow).eq('id',id).select('id').single()
+    : await db.from('products').insert(enhancedRow).select('id').single();
+  if(result.error||!result.data){
+    console.error('Product save:',result.error);
+    return toast(`No se pudo sincronizar el producto con la tienda: ${result.error?.message||'respuesta vacía'}. Verifica que supabase-unification.sql esté aplicada.`);
   }
-  if(result.error||!result.data){console.error(result.error);return toast(`No se pudo guardar el producto: ${result.error?.message||''}`);}
   productId=result.data.id;
-  if(id){await db.from('product_variants').delete().eq('product_id',productId);}
-  const {error:variantError}=await db.from('product_variants').insert(parsedVariants.map(v=>({product_id:productId,size:v.size,color:v.color,stock:v.stock,reserved:0})));
-  if(variantError){
-    console.warn('Product variants unavailable:',variantError.message);
-    toast('Producto guardado con la existencia principal. Ejecuta supabase-unification.sql para habilitar tallas y publicación web.');
+  const variantsToInsert=[];
+  for(const variant of parsedVariants){
+    const current=currentVariants.find(row=>row.size===variant.size&&(row.color||null)===(variant.color||null));
+    if(current){
+      const {error}=await db.from('product_variants').update({stock:variant.stock}).eq('id',current.id);
+      if(error){console.error('Product variant update:',error);return toast(`El producto se guardó, pero no se sincronizó la talla ${variant.size}: ${error.message}`);}
+    }else{
+      variantsToInsert.push({product_id:productId,size:variant.size,color:variant.color,stock:variant.stock,reserved:0});
+    }
+  }
+  if(variantsToInsert.length){
+    const {error}=await db.from('product_variants').insert(variantsToInsert);
+    if(error){console.error('Product variants insert:',error);return toast(`El producto se guardó, pero no se sincronizaron las tallas nuevas: ${error.message}`);}
+  }
+  const retainedKeys=new Set(parsedVariants.map(v=>`${v.size}\u0000${v.color||''}`));
+  const removedIds=currentVariants.filter(row=>!retainedKeys.has(`${row.size}\u0000${row.color||''}`)).map(row=>row.id);
+  if(removedIds.length){
+    const {error}=await db.from('product_variants').delete().in('id',removedIds);
+    if(error){console.error('Product variant delete:',error);return toast(`El producto se guardó, pero no se pudieron quitar tallas: ${error.message}`);}
   }
   await loadAll();closeModal();render('inventory');toast(id?'PRODUCTO ACTUALIZADO Y SINCRONIZADO':'PRODUCTO PUBLICADO Y SINCRONIZADO');
 }

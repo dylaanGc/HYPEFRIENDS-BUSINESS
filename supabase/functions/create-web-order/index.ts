@@ -23,6 +23,7 @@ type CatalogProduct = {
   currency: string;
   available_stock: number;
   available_sizes: string[];
+  size_stock: Record<string, number>;
   active: boolean;
   drop_available_at: string | null;
 };
@@ -238,7 +239,7 @@ Deno.serve(async (request: Request) => {
   if (payload.action === "catalog") {
     const { data, error } = await db
       .from("web_store_catalog_inventory")
-      .select("store_product_id,product_name,unit_price,currency,available_sizes,active,drop_available_at,available_stock,category,image_url,description")
+      .select("store_product_id,product_name,unit_price,currency,available_sizes,size_stock,active,drop_available_at,available_stock,category,image_url,description")
       .order("store_product_id");
     if (error) {
       console.error("Website catalog load:", error.message);
@@ -266,7 +267,7 @@ Deno.serve(async (request: Request) => {
   const productIds = [...new Set(lines.map((line) => String(line.id)))];
   const { data: catalogRows, error: catalogError } = await db
     .from("web_store_catalog_inventory")
-    .select("store_product_id,product_name,unit_price,currency,available_stock,available_sizes,active,drop_available_at,category,image_url,description")
+    .select("store_product_id,product_name,unit_price,currency,available_stock,available_sizes,size_stock,active,drop_available_at,category,image_url,description")
     .in("store_product_id", productIds);
   if (catalogError) {
     console.error("Website catalog lookup:", catalogError.message);
@@ -278,6 +279,7 @@ Deno.serve(async (request: Request) => {
   );
   let subtotal = 0;
   const requestedByProduct = new Map<string, number>();
+  const requestedBySize = new Map<string, number>();
   const orderItems = [];
   for (const line of lines) {
     const product = catalog.get(String(line.id));
@@ -291,6 +293,13 @@ Deno.serve(async (request: Request) => {
     requestedByProduct.set(product.store_product_id, requested);
     if (requested > product.available_stock) {
       return respond(request, 409, { error: `No hay suficientes unidades de ${product.product_name}.` });
+    }
+    const sizeKey = `${product.store_product_id}:${line.size}`;
+    const requestedSize = (requestedBySize.get(sizeKey) ?? 0) + line.qty;
+    requestedBySize.set(sizeKey, requestedSize);
+    if (Object.keys(product.size_stock ?? {}).length > 0 &&
+      requestedSize > Number(product.size_stock[line.size] ?? 0)) {
+      return respond(request, 409, { error: `No hay suficientes unidades de ${product.product_name} en talla ${line.size}.` });
     }
     subtotal += Number(product.unit_price) * line.qty;
     orderItems.push({
