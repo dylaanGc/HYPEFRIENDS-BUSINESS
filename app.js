@@ -69,6 +69,30 @@ const dateKey = value => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : costaRicaDateKey(date);
 };
+const costaRicaDateTimeInput = value => {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return '';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone:'America/Costa_Rica',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    hourCycle:'h23'
+  }).formatToParts(date).map(part=>[part.type,part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+};
+const formatCostaRicaDateTime = value => {
+  const date = new Date(value);
+  return !value || Number.isNaN(date.getTime())
+    ? ''
+    : new Intl.DateTimeFormat('es-CR', {
+      dateStyle:'medium',
+      timeStyle:'short',
+      timeZone:'America/Costa_Rica'
+    }).format(date);
+};
 const escapeHtml = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); };
 
@@ -451,7 +475,7 @@ function saleTable(n=99) {
 function sales(c){c.innerHTML=`<div class="content-intro"><div><h2>Todas las ventas</h2><p>Ventas y pagos en colones o dólares, según la moneda elegida para cada venta.</p></div><button class="primary" onclick="openSale()">＋ NUEVA VENTA</button></div>${saleTable()}`;}
 
 function inventory(c){
-  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Productos, tallas, variantes y publicación online sincronizada</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Categoria / Tallas</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span class="inventory-thumb">${p.image_url?`<img src="${escapeHtml(p.image_url)}" alt="Foto de ${escapeHtml(p.name)}" loading="lazy">`:'◇'}</span><span class="inventory-product-info"><span>${escapeHtml(p.name)}</span><span class="muted">${p.publish_online===false||p.active===false?'No publicado':p.store_product_id?'Publicado en tienda':'Pendiente de sincronizar'}</span><button class="secondary small inventory-photo-edit" onclick="openProductPhoto('${p.id}')">${p.image_url?'CAMBIAR FOTO':'AGREGAR FOTO'}</button></span></td><td>${escapeHtml(p.category_slug||p.category||'General')}<br><span class="muted">${escapeHtml((p.variants||[]).map(v=>`${v.size}: ${v.stock}`).join(', ')||p.size||'—')}</span></td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openProduct('${p.id}')">EDITAR</button><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
+  c.innerHTML=`<div class="content-intro"><div><h2>Control de inventario</h2><p>Productos, tallas, variantes y publicación online sincronizada</p></div><button class="primary inventory-add" onclick="openProduct()">＋ <span>AGREGAR PRODUCTO</span></button></div><div class="table-wrap inventory-table"><table><thead><tr><th>Producto</th><th>Categoria / Tallas</th><th>Stock</th><th>Costo unit.</th><th>Precio venta</th><th>Acciones</th></tr></thead><tbody>${state.products.map(p=>`<tr><td class="inventory-name"><span class="inventory-thumb">${p.image_url?`<img src="${escapeHtml(p.image_url)}" alt="Foto de ${escapeHtml(p.name)}" loading="lazy">`:'◇'}</span><span class="inventory-product-info"><span>${escapeHtml(p.name)}</span><span class="muted">${p.publish_online===false||p.active===false?'No publicado':p.store_product_id?'Publicado en tienda':'Pendiente de sincronizar'}${p.drop_available_at?` · Lanzamiento ${escapeHtml(formatCostaRicaDateTime(p.drop_available_at))}`:''}</span><button class="secondary small inventory-photo-edit" onclick="openProductPhoto('${p.id}')">${p.image_url?'CAMBIAR FOTO':'AGREGAR FOTO'}</button></span></td><td>${escapeHtml(p.category_slug||p.category||'General')}<br><span class="muted">${escapeHtml((p.variants||[]).map(v=>`${v.size}: ${v.stock}`).join(', ')||p.size||'—')}</span></td><td><span class="stock-badge">${Number(p.stock)} disp.</span></td><td>${money(p.cost,p.cost_currency||p.currency||'CRC')}</td><td class="inventory-price">${money(p.price,p.currency)}</td><td><div class="actions"><button class="secondary small" onclick="openProduct('${p.id}')">EDITAR</button><button class="secondary small" onclick="openStockAdjustment('${p.id}')">AJUSTAR</button><button class="delete-button" onclick="deleteProduct('${p.id}')">QUITAR</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No hay productos. Agrega el primero con el botón superior.</td></tr>'}</tbody></table></div>`;
 }
 
 function finance(c){
@@ -873,7 +897,7 @@ function openProduct(id=null){
   const variants=product?.variants||[];
   const sizes=variants.length?variants.map(v=>`${v.size}:${v.stock}${v.color?`:${v.color}`:''}`).join(', '):(product?.size?`${product.size}:${Number(product.stock||0)}`:'S:0, M:0, L:0, XL:0');
   const categoryOptions=(state.categories.length?state.categories:[{slug:'tee',name:'Camisetas'},{slug:'hoodie',name:'Hoodies'},{slug:'short',name:'Shorts'},{slug:'cap',name:'Gorras'},{slug:'accessory',name:'Accesorios'}]);
-  modal(`<h2>${product?'EDITAR PRODUCTO':'NUEVO PRODUCTO'}</h2><div class="form"><label>Nombre<input id="pName" required value="${escapeHtml(product?.name||'')}"></label><label>Descripción<textarea id="pDescription">${escapeHtml(product?.description||'')}</textarea></label><div class="form-grid"><label>Categoría<select id="pCategory">${categoryOptions.map(cat=>`<option value="${escapeHtml(cat.slug)}" ${(product?.category_slug||product?.category||'tee')===cat.slug?'selected':''}>${escapeHtml(cat.name)}</option>`).join('')}</select></label><label>Publicación<select id="pPublish"><option value="true" ${product?.publish_online!==false?'selected':''}>Publicar en tienda</option><option value="false" ${product?.publish_online===false?'selected':''}>Desactivado</option></select></label><label>Moneda del costo<select id="pCostCurrency"><option value="CRC" ${(product?.cost_currency||'CRC')==='CRC'?'selected':''}>CRC</option><option value="USD" ${(product?.cost_currency||'CRC')==='USD'?'selected':''}>USD</option></select></label><label>Costo unitario<input id="pCost" type="number" value="${Number(product?.cost||0)}" min="0" step="0.01"></label><label>Moneda del precio<select id="pPriceCurrency"><option value="CRC" ${(product?.currency||'CRC')==='CRC'?'selected':''}>CRC</option><option value="USD" ${(product?.currency||'CRC')==='USD'?'selected':''}>USD</option></select></label><label>Precio de venta<input id="pPrice" type="number" value="${Number(product?.price||0)}" min="0" step="0.01"></label></div><label>Tallas y existencias<input id="pSizes" value="${escapeHtml(sizes)}" placeholder="S:5, M:10, L:8, XL:4"><span class="muted">Formato: TALLA:CANTIDAD, separados por comas.</span></label><label>Colores opcionales<input id="pColor" value="${escapeHtml(product?.product_color||variants[0]?.color||'')}" placeholder="Negro, Blanco"></label><p class="muted">Las existencias se administran por talla y se publican automáticamente en la tienda.</p><button class="primary" onclick="${product?`saveProduct('${product.id}')`:'createProduct()'}">${product?'GUARDAR CAMBIOS':'GUARDAR PRODUCTO'}</button></div>`);
+  modal(`<h2>${product?'EDITAR PRODUCTO':'NUEVO PRODUCTO'}</h2><div class="form"><label>Nombre<input id="pName" required value="${escapeHtml(product?.name||'')}"></label><label>Descripción<textarea id="pDescription">${escapeHtml(product?.description||'')}</textarea></label><div class="form-grid"><label>Categoría<select id="pCategory">${categoryOptions.map(cat=>`<option value="${escapeHtml(cat.slug)}" ${(product?.category_slug||product?.category||'tee')===cat.slug?'selected':''}>${escapeHtml(cat.name)}</option>`).join('')}</select></label><label>Publicación<select id="pPublish"><option value="true" ${product?.publish_online!==false?'selected':''}>Publicar en tienda</option><option value="false" ${product?.publish_online===false?'selected':''}>Desactivado</option></select></label><label>Fecha de lanzamiento en tienda (opcional)<input id="pDropAvailableAt" type="datetime-local" step="60" value="${escapeHtml(costaRicaDateTimeInput(product?.drop_available_at))}"><span class="muted">La hora se interpreta en Costa Rica. La prenda aparecerá como “Próximamente” y no se podrá comprar hasta esa fecha. Déjala vacía para publicarla de inmediato.</span></label><label>Moneda del costo<select id="pCostCurrency"><option value="CRC" ${(product?.cost_currency||'CRC')==='CRC'?'selected':''}>CRC</option><option value="USD" ${(product?.cost_currency||'CRC')==='USD'?'selected':''}>USD</option></select></label><label>Costo unitario<input id="pCost" type="number" value="${Number(product?.cost||0)}" min="0" step="0.01"></label><label>Moneda del precio<select id="pPriceCurrency"><option value="CRC" ${(product?.currency||'CRC')==='CRC'?'selected':''}>CRC</option><option value="USD" ${(product?.currency||'CRC')==='USD'?'selected':''}>USD</option></select></label><label>Precio de venta<input id="pPrice" type="number" value="${Number(product?.price||0)}" min="0" step="0.01"></label></div><label>Tallas y existencias<input id="pSizes" value="${escapeHtml(sizes)}" placeholder="S:5, M:10, L:8, XL:4"><span class="muted">Formato: TALLA:CANTIDAD, separados por comas.</span></label><label>Colores opcionales<input id="pColor" value="${escapeHtml(product?.product_color||variants[0]?.color||'')}" placeholder="Negro, Blanco"></label><p class="muted">Las existencias se administran por talla y se publican automáticamente en la tienda.</p><button class="primary" onclick="${product?`saveProduct('${product.id}')`:'createProduct()'}">${product?'GUARDAR CAMBIOS':'GUARDAR PRODUCTO'}</button></div>`);
 }
 
 async function createProduct(){await saveProduct(null);}
@@ -881,6 +905,9 @@ async function createProduct(){await saveProduct(null);}
 async function saveProduct(id){
   const name=$('#pName').value.trim(), description=$('#pDescription').value.trim(), cost=Number($('#pCost').value), price=Number($('#pPrice').value);
   if(!name||![cost,price].every(Number.isFinite)||cost<0||price<0)return toast('Revisa el nombre, costo y precio.');
+  const launchValue=$('#pDropAvailableAt').value;
+  const launchDate=launchValue?new Date(`${launchValue}:00-06:00`):null;
+  if(launchValue&&(!launchDate||Number.isNaN(launchDate.getTime())))return toast('Revisa la fecha y hora de lanzamiento.');
   let storeId;
   if(id){const current=state.products.find(row=>row.id===id);storeId=current?.store_product_id;}
   if(!storeId){
@@ -910,6 +937,7 @@ async function saveProduct(id){
     price,
     cost_currency:$('#pCostCurrency').value,
     currency:$('#pPriceCurrency').value,
+    drop_available_at:launchDate?.toISOString()||null,
     updated_at:new Date().toISOString()
   };
   const enhancedRow={
@@ -927,6 +955,7 @@ async function saveProduct(id){
     : await db.from('products').insert(enhancedRow).select('id').single();
   if(result.error||!result.data){
     console.error('Product save:',result.error);
+    if(String(result.error?.message||'').includes('drop_available_at'))return toast('Aplica primero supabase-product-launch-date.sql en Supabase para guardar fechas de lanzamiento.');
     return toast(`No se pudo sincronizar el producto con la tienda: ${result.error?.message||'respuesta vacía'}. Verifica que supabase-unification.sql esté aplicada.`);
   }
   productId=result.data.id;

@@ -51,5 +51,8 @@ Se requiere HTTPS; en iPhone, una PWA instalada y una versión compatible de iOS
 4. Los productos publicados usan `store_product_id`, categoría, descripción, fotografía, talla y variantes. Al guardar o desactivar un producto, el trigger actualiza `web_store_catalog` y la tienda.
 5. Las ventas locales usan la función RPC `create_local_sale`; bloquean la variante y impiden stock negativo. Los pedidos web y sus cancelaciones también concilian las variantes centrales.
 
+## Fechas de lanzamiento de prendas
+Para programar desde Finanzas cuándo se puede comprar un producto en la tienda, ejecuta `supabase-product-launch-date.sql` en Supabase SQL Editor después de `supabase-unification.sql`. Luego edita el producto en **Inventario → Editar** y completa **Fecha de lanzamiento en tienda** con la hora de Costa Rica. La tienda lo mostrará como “Próximamente” y el checkout rechazará la compra hasta esa fecha. Deja el campo vacío para venderlo inmediatamente. La fecha y hora se sincronizan automáticamente con el catálogo web.
+
 ## Publicación
 Sube todos los archivos de esta carpeta a un hosting HTTPS estático como Vercel, Netlify, Cloudflare Pages o GitHub Pages. Para que la instalación PWA y el login funcionen correctamente, la URL pública debe usar HTTPS.
