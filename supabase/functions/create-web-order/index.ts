@@ -37,6 +37,8 @@ const baseHeaders = {
 function allowedOrigins(): Set<string> {
   return new Set([
     "https://dylaangc.github.io",
+    "https://hypefriendscr.com",
+    "https://www.hypefriendscr.com",
     ...(Deno.env.get("ALLOWED_ORIGINS") ?? "")
       .split(",")
       .map((origin) => origin.trim())

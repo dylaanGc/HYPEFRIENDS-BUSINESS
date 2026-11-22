@@ -6,7 +6,7 @@ param(
   [int]$GamShippingCRC = 2000,
   [int]$OutsideGamShippingCRC = 3500,
   [string]$VapidSubject = "mailto:soporte@hypefriends.com",
-  [string]$AllowedOrigins = "https://dylaangc.github.io"
+  [string]$AllowedOrigins = "https://dylaangc.github.io,https://hypefriendscr.com,https://www.hypefriendscr.com"
 )
 
 $ErrorActionPreference = "Stop"
